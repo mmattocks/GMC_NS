@@ -1,0 +1,4 @@
+name = "GMC_NS"
+uuid = "9078412d-88cf-4063-aac6-2559f950d761"
+authors = ["Michael Mattocks <mike.mattocks@utoronto.ca>"]
+version = "0.1.0"
