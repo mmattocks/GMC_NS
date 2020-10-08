@@ -28,6 +28,7 @@ Abstract supertype for model ensembles intended to be subjected to Galilean Mont
         GMC_tune_ι::Int64 #maximum number of initial τ tuning steps
         GMC_tune_ρ::Float64 #apply this scale parameter to the ensemble size to obtain the number of GMC samples per initial tuning step
         GMC_tune_α::Float64 #tune τ such that the acceptance rate is between this value and 1.
+        GMC_timestep_η::Float64 #>0. to apply an perturbation term randomly drawn from Normal(0, η*τ)
         GMC_exhaust_σ::Float64 #apply this scale parameter to the ensemble size to obtain the maximum number of GMC iterates to perform before terminating nested sampling
         GMC_reflect_η::Float64 #>0. to apply perturbation to reflection vectors, keep value small
 

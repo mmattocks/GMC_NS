@@ -19,6 +19,7 @@ Finally, if reflection fails to produce a new particle inside the contour, inver
 
 """
 function galilean_trajectory_sample!(m, e, τ)
+    e.GMC_timestep_η > 0. && τ+=rand(Normal(0,τ*e.GMC_timestep_η))
     d=τ*m.v #distance vector for given timestep
     new_m=e.model_initλ(0, m.id, m.θ+d, m.v, e.constants...) #try to proceed along distance vector
     if new_m.log_Li <= e.contour #if that didnt work

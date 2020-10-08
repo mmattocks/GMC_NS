@@ -6,8 +6,12 @@ module GMC_NS
     import Random: rand, seed!, shuffle!
     import Distances: euclidean
 
+    include("ensemble/GMC_NS_Ensemble.jl")
+    include("model/GMC_NS_Model.jl")
     include("GMC/galilean_trajectory.jl")
-    include("GMC/permute_control.jl")
+    include("GMC/GMC_sample.jl")
     include("nested_sampler/nested_step.jl")
     include("nested_sampler/converge_ensemble.jl")
+    include("utilities/ns_progressmeter.jl")
+    include("utilities/t_Tuner.jl")
 end # module

@@ -2,9 +2,7 @@ mutable struct τ_Tuner
     successes::BitVector #(memoryxfunc)
     τ::Float64
     τ_history::Vector{Float64}
-    function τ_Tuner(τ1,)
-
-
+    τ_Tuner(τ1)=new(falses(0),τ1,zeros(0))
 end
 
 function init_tune(e<:GMC_NS_Ensemble)

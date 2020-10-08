@@ -12,12 +12,11 @@ function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), bac
 
     converge_check = get_convfunc(converge_criterion)
     while !converge_check(e, converge_factor) && (curr_it <= max_iterates)
-        warn,step_report = nested_step!(e, τ)
+        warn,step_report = nested_step!(e, tuner.τ)
         warn == 1 && (@error "Failed to find new models, aborting at current iterate."; return e)
         curr_it += 1
 
         tune_τ!(tuner, step_report)
-        instruction = tuner.inst
 
         backup[1] && curr_it%backup[2] == 0 && e_backup(e,tuner) #every backup interval, serialise the ensemble and instruction
         clean[1] &&  !e.sample_posterior && curr_it%clean[2] == 0 && clean_ensemble_dir(e,clean[3]) #every clean interval, remove old discarded models
