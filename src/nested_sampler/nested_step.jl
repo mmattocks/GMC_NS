@@ -1,34 +1,38 @@
-#### IMPLEMENTATION OF JEFF SKILLINGS' NESTED SAMPLING ALGORITHM ####
-function nested_step!(e::Ensemble)
+"""
+    nested_step!(e<:GMC_NS_Ensemble)
+
+Step and update ensemble e by sampling the e.contour-bounded prior mass via Galilean Monte Carlo.
+
+"""
+function nested_step!(e<:GMC_NS_Ensemble,τ)
     N = length(e.models) #number of sample models/particles on the posterior surface
     i = length(e.log_Li) #iterate number, index for last values
     j = i+1 #index for newly pushed values
 
     e.contour, least_likely_idx = findmin([model.log_Li for model in e.models])
-
-    #REMOVE OLD LEAST LIKELY MODEL
     Li_model = e.models[least_likely_idx]
-    deleteat!(e.models, least_likely_idx)
-
-    e.sample_posterior && push!(e.retained_posterior_samples, Li_model)#if sampling posterior, push the model record to the ensemble's posterior samples vector
 
     #SELECT NEW MODEL, SAVE TO ENSEMBLE DIRECTORY, CREATE RECORD AND PUSH TO ENSEMBLE
     model_selected=false; step_report=0
     while !model_selected
-        candidate,step_report=
+        candidate,step_report=GMC_sample(e,τ)
         if !(candidate===nothing)
             model_selected=true
-            new_model_record = Model_Record(string(e.path,'/',e.model_counter), candidate.log_Li);
-            push!(e.models, new_model_record);
+            candidate.id=e.model_counter
+            
+            deleteat!(e.models, least_likely_idx) #remove least likely model record
+            e.sample_posterior && push!(e.posterior_samples, Li_model)#if sampling posterior, push the model record to the ensemble's posterior samples vector
+
+            new_model_record = Model_Record(string(e.path,'/',e.model_counter), candidate.log_Li)
+            push!(e.models, new_model_record) #insert new model record
             serialize(new_model_record.path, candidate)
+
             e.model_counter +=1
-            end
         else
-            push!(e.models, Li_model)
             return 1, step_report
         end
     end
-         
+      
     #UPDATE ENSEMBLE QUANTITIES   
     push!(e.log_Li, minimum([model.log_Li for model in e.models])) #log likelihood of the least likely model - the current ensemble ll contour at Xi
     push!(e.log_Xi, -i/N) #log Xi - crude estimate of the iterate's enclosed prior mass
