@@ -6,7 +6,7 @@ Abstract supertype for model ensembles intended to be subjected to Galilean Mont
     mutable struct Minimal_Ensemble <: GMC_NS_Ensemble
         path::String #ensemble records serialized here
         
-        models::Vector{<:GMC_NS_Model_Record} #model paths & lhs
+        models::Vector{<:GMC_NS_Model_Record} #records of model paths & lhs
         model_initλ::Function #GMC_NS_Model constructor
 
         contour<:AbstractFloat #current log_Li[end], init minimum([record.log_Li for record in models])
@@ -24,14 +24,19 @@ Abstract supertype for model ensembles intended to be subjected to Galilean Mont
         sample_posterior::Bool #switch for posterior_samples collection
         posterior_samples::Vector{<:GMC_NS_Model_Record}
 
-        #GMC Sampler settings
-        GMC_tune_ι::Int64 #maximum number of initial τ tuning steps
-        GMC_tune_ρ::Float64 #apply this scale parameter to the ensemble size to obtain the number of GMC samples per initial tuning step
-        GMC_tune_α::Float64 #tune τ such that the acceptance rate is between this value and 1.
-        GMC_timestep_η::Float64 #>0. to apply an perturbation term randomly drawn from Normal(0, η*τ)
-        GMC_exhaust_σ::Float64 #apply this scale parameter to the ensemble size to obtain the maximum number of GMC iterates to perform before terminating nested sampling
-        GMC_reflect_η::Float64 #>0. to apply perturbation to reflection vectors, keep value small
+        #GMC tuning settings
+        GMC_tune_ι<:Integer #maximum number of initial τ tuning steps
+        GMC_tune_ρ<:AbstractFloat #use ensemble size*ρ GMC samples per initial tuning step
+        GMC_tune_μ<:Integer #tune τ on the basis of this number of the most recent steps
+        GMC_tune_α<:AbstractFloat #tune τ such that the acceptance rate is between this value and 1.
+        GMC_tune_β<:AbstractFloat #multiply τ by 1+β (sampling acceptance rate=1.) or 1-β (rate <α)
 
+        #GMC Sampler settings
+        GMC_timestep_η<:AbstractFloat #>0. to apply an perturbation term randomly drawn from Normal(0, η*τ) to τ at each step (can assist equilibration)
+        GMC_reflect_η<:AbstractFloat #>0. to apply perturbation to reflection vectors, keep value small (can assist equilibration)
+        GMC_exhaust_σ<:AbstractFloat #apply this scale parameter to the ensemble size to obtain the maximum number of GMC iterates to perform before terminating nested sampling
+
+        model_counter<:Integer
     end 
 
 """
@@ -44,7 +49,7 @@ abstract type GMC_NS_Ensemble end
 
 Display the ensemble path, likelihood histogram, contour, maximum log likelihood, and log evidence (marginal likelihood). 
 """
-function Base.show(io::IO, e<:GMC_NS_Ensemble; progress=false)
+function Base.show(io::IO, e::GMC_NS_Ensemble; progress=false)
 	livec=[model.log_Li for model in e.models]
 	maxLH=maximum(livec)
 	printstyled(io, "$(typeof(e)) @ $(e.path)\n", bold=true)

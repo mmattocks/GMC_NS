@@ -1,13 +1,25 @@
 mutable struct τ_Tuner
-    successes::BitVector #(memoryxfunc)
     τ::Float64
     τ_history::Vector{Float64}
-    τ_Tuner(τ1)=new(falses(0),τ1,zeros(0))
+    min_acceptance::Float64
+    tune_rate::Float64
+    successes::BitVector #(memoryxfunc)
+    s_memory::Integer
+
+
+    function τ_Tuner(τ1, e::GMC_NS_Ensemble)
+        new(τ1,
+        zeros(0),
+        e.GMC_tune_α,
+        e.GMC_tune_β,
+        falses(0),
+        e.GMC_tune_μ)
+    end
 end
 
-function init_tune(e<:GMC_NS_Ensemble)
+function init_tune(e::GMC_NS_Ensemble)
     @info "Performing initial GMC timestep tuning on ensemble..."
-    τ=1.; tuned=false; τd=1.1; accept=1.; it+1
+    τ=1.; tuned=false; τd=1.1; accept=1.; it=1
     while !tuned && it<e.GMC_tune_ι
         test_report=falses(0)
         while length(test_report)<Int64(floor(length(e.models)*e.GMC_tune_ρ))
@@ -22,22 +34,40 @@ function init_tune(e<:GMC_NS_Ensemble)
 
         if accept == 1.
             τ*=τd
-            last_accept == 1. && τd*=τd
-            last_accept < e.GMC_τune_α && τd=min(1.000001,.9*τd)
-        elseif accept < e.GMC_τune_α
+            last_accept == 1. && (τd*=1+e.GMC_tune_β)
+            last_accept < e.GMC_tune_α && (τd=min(1.000001,1-e.GMC_tune_β*τd))
+        elseif accept < e.GMC_tune_α
             τ/=τd
-            last_accept == 1. && τd=min(1.000001,.9*τd)
-            last_accept < e.GMC_τune_α && τd*=τd
+            last_accept == 1. && (τd=min(1.000001,1-e.GMC_tune_β*τd))
+            last_accept < e.GMC_tune_α && (τd*=1+e.GMC_tune_β)
         else
             return τ
         end
 
         it+=1
     end
-    return t
+    return τ
 end
 
-function Base.show(io::IO, tuner::Permute_Tuner; progress=false)
-    show(io, tuner.tabular_display, rowlabel=:I, summary=false)
-    progress && return(size(tuner.tabular_display,1)+4)
+function tune_τ!(t::τ_Tuner, step_report::BitVector)
+    push!(t.τ_history,t.τ)
+    t.successes=vcat(t.successes,step_report)
+    ls=length(t.successes)
+    ls>t.s_memory && (t.successes=t.successes[ls-t.s_memory:end])
+
+    accept=sum(t.successes)/ls
+    if accept==1.
+        t.τ=t.τ*(1+t.tune_rate)
+    elseif accept<t.min_acceptance
+        t.τ=t.τ*(1-t.tune_rate)
+    end
+end
+
+function Base.show(io::IO, t::τ_Tuner; progress=false)
+    plot=lineplot(t.τ_history, title="τ History", xlabel="Iterate", color=:white, name="τ")
+    show(io, plot)
+    println()
+    println("τ:$(t.τ), α:$(t.min_acceptance), β:$(t.tune_rate)")
+
+    progress && return nrows(plot.graphics)+7
 end

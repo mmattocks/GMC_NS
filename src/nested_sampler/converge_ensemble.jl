@@ -1,14 +1,14 @@
-function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), backup::Tuple{Bool,Integer}=(false,0), clean::Tuple{Bool,Integer,Integer}=(false,0,0), verbose::Bool=false, converge_criterion::String="standard", converge_factor::AbstractFloat=.001, progargs...)
+function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), backup::Tuple{Bool,Integer}=(false,0), clean::Tuple{Bool,Integer,Integer}=(false,0,0), verbose::Bool=false, converge_criterion::String="standard", converge_factor::AbstractFloat=.01, progargs...)
     N = length(e.models); curr_it=length(e.log_Li)
 
     if curr_it==1 || !isfile(e.path*"/tuner")
         init_τ=init_tune(e)
-        tuner=τ_Tuner(init_τ)
+        tuner=τ_Tuner(init_τ, e);
     else
         tuner=deserialize(e.path*"/tuner") #restore tuner from saved if any
     end
 
-    meter = ProgressNS(e, tuner, 0.; start_it=curr_it, progargs...)
+    meter = GMC_NS_Progress(e, tuner, 0.; start_it=curr_it, progargs...)
 
     converge_check = get_convfunc(converge_criterion)
     while !converge_check(e, converge_factor) && (curr_it <= max_iterates)
@@ -40,22 +40,26 @@ function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), bac
     end
 end
 
-function converge_ensemble!(e::IPM_Ensemble, instruction::Permute_Instruct, wk_pool::Vector{Int64}; max_iterates=typemax(Int64), backup::Tuple{Bool,Integer}=(false,0), clean::Tuple{Bool,Integer,Integer}=(false,0,0), verbose::Bool=false, converge_criterion::String="standard", converge_factor::AbstractFloat=.001, progargs...)
+function converge_ensemble!(e::GMC_NS_Ensemble, wk_pool::Vector{Int64}; max_iterates=typemax(Int64), backup::Tuple{Bool,Integer}=(false,0), clean::Tuple{Bool,Integer,Integer}=(false,0,0), verbose::Bool=false, converge_criterion::String="standard", converge_factor::AbstractFloat=.001, progargs...)
     N = length(e.models)
-    
     converge_check = get_convfunc(converge_criterion)
-    model_chan= RemoteChannel(()->Channel{Tuple{Union{ICA_PWM_Model,String},Integer, AbstractVector{<:Tuple}}}(10*length(wk_pool))) #channel to take EM iterates off of
-    job_chan = RemoteChannel(()->Channel{Tuple{<:AbstractVector{<:Model_Record}, Float64, Union{Permute_Instruct,String}}}(1))
-    put!(job_chan,(e.models, e.contour, instruction))    
-    
+
+    curr_it=length(e.log_Li)
+    if curr_it==1 || !isfile(e.path*"/tuner")
+        init_τ=init_tune(e)
+        tuner=τ_Tuner(init_τ, e.GMC);
+    else
+        tuner=deserialize(e.path*"/tuner") #restore tuner from saved if any
+    end
+
+    model_chan= RemoteChannel(()->Channel{<:GMC_NS_Model}(Inf)) #channel to take EM iterates off of
+    job_chan = RemoteChannel(()->Channel{Tuple{<:AbstractVector{<:GMC_NS_Model_Record}, Float64, Float64}}(1))
+    put!(job_chan,(e.models, e.contour, init_τ))    
     if !converge_check(e,converge_factor) #sequence workers only if not already converged
         @async sequence_workers(wk_pool, permute_IPM, e, job_chan, model_chan)
     end
 
-    curr_it=length(e.log_Li)
-    wk_mon=Worker_Monitor(wk_pool)
-    curr_it>1 && isfile(e.path*"/tuner") ? (tuner=deserialize(e.path*"/tuner")) : (tuner = Permute_Tuner(instruction)) #restore tuner from saved if any
-    meter = ProgressNS(e, wk_mon, tuner, 0.; start_it=curr_it, progargs...)
+    meter = GMC_NS_Progress(e, tuner, 0.; start_it=curr_it, progargs...)
 
     while !converge_check(e, converge_factor) && (curr_it <= max_iterates)
 
@@ -66,7 +70,7 @@ function converge_ensemble!(e::IPM_Ensemble, instruction::Permute_Instruct, wk_p
         e.sample_posterior && push!(e.retained_posterior_samples, Li_model)#if sampling posterior, push the model record to the ensemble's posterior samples vector
 
         warn, step_report = nested_step!(e, model_chan, wk_mon, Li_model) #step the ensemble
-        warn == 1 && #"1" passed for warn code means no workers persist; all have hit the permute limit
+        warn == 1 &&
                 (@error "All workers failed to find new models, aborting at current iterate."; return e) #if there is a warning, iust return the ensemble and print info
         curr_it += 1
         tune_weights!(tuner, step_report)
@@ -78,7 +82,7 @@ function converge_ensemble!(e::IPM_Ensemble, instruction::Permute_Instruct, wk_p
         update!(meter, converge_check(e,converge_factor,vals=true)...)
     end
 
-    take!(job_chan); put!(job_chan, (e.models, e.contour, "stop")) #stop instruction terminates worker functions
+    take!(job_chan); put!(job_chan, (e.models, e.contour, 0.)) #0. τ terminates worker functions
 
     if converge_check(e,converge_factor)
         final_logZ = complete_evidence(e)

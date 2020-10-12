@@ -4,7 +4,8 @@
 Step and update ensemble e by sampling the e.contour-bounded prior mass via Galilean Monte Carlo.
 
 """
-function nested_step!(e<:GMC_NS_Ensemble,τ)
+
+function nested_step!(e::GMC_NS_Ensemble,τ)
     N = length(e.models) #number of sample models/particles on the posterior surface
     i = length(e.log_Li) #iterate number, index for last values
     j = i+1 #index for newly pushed values
@@ -13,25 +14,36 @@ function nested_step!(e<:GMC_NS_Ensemble,τ)
     Li_model = e.models[least_likely_idx]
 
     #SELECT NEW MODEL, SAVE TO ENSEMBLE DIRECTORY, CREATE RECORD AND PUSH TO ENSEMBLE
-    model_selected=false; step_report=0
-    while !model_selected
-        candidate,step_report=GMC_sample(e,τ)
-        if !(candidate===nothing)
+    model_selected=false; report=falses(0);
+    samples=0; sample_limit=Int64(floor(length(e.models)*e.GMC_exhaust_σ))
+
+    while !model_selected && samples<=sample_limit
+        m_record = rand(e.models)
+        m = deserialize(m_record.path)
+        candidate=galilean_trajectory_sample!(m,e,τ)
+
+        if candidate.id==m.id #particle reversed rather than new sample
+            push!(report, false)
+            serialize(m_record.path,candidate)
+            samples+=1
+        else
+            push!(report, true)
+
             model_selected=true
             candidate.id=e.model_counter
             
             deleteat!(e.models, least_likely_idx) #remove least likely model record
             e.sample_posterior && push!(e.posterior_samples, Li_model)#if sampling posterior, push the model record to the ensemble's posterior samples vector
 
-            new_model_record = Model_Record(string(e.path,'/',e.model_counter), candidate.log_Li)
+            new_model_record = typeof(e.models[1])(string(e.path,'/',e.model_counter), candidate.log_Li)
             push!(e.models, new_model_record) #insert new model record
             serialize(new_model_record.path, candidate)
 
             e.model_counter +=1
-        else
-            return 1, step_report
         end
     end
+
+    samples==sample_limit && (return 1, report)
       
     #UPDATE ENSEMBLE QUANTITIES   
     push!(e.log_Li, minimum([model.log_Li for model in e.models])) #log likelihood of the least likely model - the current ensemble ll contour at Xi
@@ -45,34 +57,45 @@ function nested_step!(e<:GMC_NS_Ensemble,τ)
             (exp(lps(e.log_Zi[i],-e.log_Zi[j])) * lps(e.Hi[i],e.log_Zi[i])), #term2
             -e.log_Zi[j])) #term3
 
-    return 0, step_report
+    return 0, report
 end
 
-function nested_step!(e::IPM_Ensemble, model_chan::RemoteChannel, wk_mon::Worker_Monitor, Li_model::Model_Record)
+function nested_step!(e::GMC_NS_Ensemble, model_chan::RemoteChannel)
     N = length(e.models)+1 #number of sample models/particles on the posterior surface- +1 as one has been removed in the distributed dispatch for converge_ensemble
     i = length(e.log_Li) #iterate number, index for last values
     j = i+1 #index for newly pushed values
 
     #SELECT NEW MODEL, SAVE TO ENSEMBLE DIRECTORY, CREATE RECORD AND PUSH TO ENSEMBLE
-    model_selected=false;wk=0;step_report=0
-    while !model_selected
+    model_selected=false; report=falses(0);
+    samples=0; sample_limit=Int64(floor(length(e.models)*e.GMC_exhaust_σ))
+
+    while !model_selected && samples<=sample_limit
         @async wait(model_chan)
-        candidate,wk,step_report = take!(model_chan)
-        if !(candidate=="quit")
-            if (candidate.log_Li > e.contour) && !(candidate.log_Li in [m.log_Li for m in e.models])
-                model_selected=true
-                new_model_record = Model_Record(string(e.path,'/',e.model_counter), candidate.log_Li);
-                push!(e.models, new_model_record);
-                final_model=ICA_PWM_Model(string(e.model_counter), candidate.origin, candidate.sources, candidate.source_length_limits, candidate.mix_matrix, candidate.log_Li, candidate.permute_blacklist)
-                serialize(new_model_record.path, final_model)
-                e.model_counter +=1
-            end
-            update_worker_monitor!(wk_mon,wk,true)
+        candidate = take!(model_chan)
+
+        if candidate.id!=0 #particle reversed rather than new sample
+            push!(report, false)
+            path=e.path*'/'*string(candidate.id)
+            serialize(path,candidate)
+            samples+=1
         else
-            update_worker_monitor!(wk_mon,wk,false)
-            !any(wk_mon.persist) && ((push!(e.models, Li_model)); return 1,step_report)
+            push!(report, true)
+
+            model_selected=true
+            candidate.id=e.model_counter
+            
+            deleteat!(e.models, least_likely_idx) #remove least likely model record
+            e.sample_posterior && push!(e.posterior_samples, Li_model)#if sampling posterior, push the model record to the ensemble's posterior samples vector
+
+            new_model_record = Model_Record(string(e.path,'/',e.model_counter), candidate.log_Li)
+            push!(e.models, new_model_record) #insert new model record
+            serialize(new_model_record.path, candidate)
+
+            e.model_counter +=1
         end
     end
+
+    samples==sample_limit && (return 1, report)
     
     #UPDATE ENSEMBLE QUANTITIES   
     push!(e.log_Li, minimum([model.log_Li for model in e.models])) #log likelihood of the least likely model - the current ensemble ll contour at Xi
