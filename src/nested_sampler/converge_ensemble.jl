@@ -1,9 +1,9 @@
-function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), backup::Tuple{Bool,Integer}=(false,0), clean::Tuple{Bool,Integer,Integer}=(false,0,0), verbose::Bool=false, converge_criterion::String="standard", converge_factor::AbstractFloat=.01, progargs...)
+function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), τ0::Float64=0., backup::Tuple{Bool,Integer}=(false,0), clean::Tuple{Bool,Integer,Integer}=(false,0,0), verbose::Bool=false, converge_criterion::String="standard", converge_factor::AbstractFloat=.01, τPID::NTuple{3,Float64}=(.1,1e-5,.1), progargs...)
     N = length(e.models); curr_it=length(e.log_Li)
 
     if curr_it==1 || !isfile(e.path*"/tuner")
-        init_τ=init_tune(e)
-        tuner=τ_Tuner(init_τ, e);
+        τ0 > 0. ? (init_τ=τ0) : (init_τ=init_tune(e))
+        tuner=τ_PID(init_τ, e, τPID...);
     else
         tuner=deserialize(e.path*"/tuner") #restore tuner from saved if any
     end
@@ -12,11 +12,9 @@ function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), bac
 
     converge_check = get_convfunc(converge_criterion)
     while !converge_check(e, converge_factor) && (curr_it <= max_iterates)
-        warn,step_report = nested_step!(e, tuner.τ)
+        warn = nested_step!(e, tuner)
         warn == 1 && (@error "Failed to find new models, aborting at current iterate."; return e)
         curr_it += 1
-
-        tune_τ!(tuner, step_report)
 
         backup[1] && curr_it%backup[2] == 0 && e_backup(e,tuner) #every backup interval, serialise the ensemble and instruction
         clean[1] &&  !e.sample_posterior && curr_it%clean[2] == 0 && clean_ensemble_dir(e,clean[3]) #every clean interval, remove old discarded models
@@ -40,44 +38,46 @@ function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), bac
     end
 end
 
-function converge_ensemble!(e::GMC_NS_Ensemble, wk_pool::Vector{Int64}; max_iterates=typemax(Int64), backup::Tuple{Bool,Integer}=(false,0), clean::Tuple{Bool,Integer,Integer}=(false,0,0), verbose::Bool=false, converge_criterion::String="standard", converge_factor::AbstractFloat=.001, progargs...)
+function converge_ensemble!(e::GMC_NS_Ensemble, wk_pool::Vector{Int64}; max_iterates=typemax(Int64), τ0::Float64=0., backup::Tuple{Bool,Integer}=(false,0), clean::Tuple{Bool,Integer,Integer}=(false,0,0), verbose::Bool=false, converge_criterion::String="standard", converge_factor::AbstractFloat=.001, progargs...)
     N = length(e.models)
     converge_check = get_convfunc(converge_criterion)
 
     curr_it=length(e.log_Li)
     if curr_it==1 || !isfile(e.path*"/tuner")
-        init_τ=init_tune(e)
-        tuner=τ_Tuner(init_τ, e.GMC);
+        τ0 > 0. ? (init_τ=τ0) : (init_τ=init_tune(e))
+        tuner=τ_Tuner(init_τ, e);
     else
         tuner=deserialize(e.path*"/tuner") #restore tuner from saved if any
     end
 
-    model_chan= RemoteChannel(()->Channel{<:GMC_NS_Model}(Inf)) #channel to take EM iterates off of
+    @info "wrreeowow"
+
+    model_chan= RemoteChannel(()->Channel{GMC_NS_Model}(Inf)) #channel to take EM iterates off of
     job_chan = RemoteChannel(()->Channel{Tuple{<:AbstractVector{<:GMC_NS_Model_Record}, Float64, Float64}}(1))
-    put!(job_chan,(e.models, e.contour, init_τ))    
+    put!(job_chan,(e.models, e.contour, tuner.τ))    
     if !converge_check(e,converge_factor) #sequence workers only if not already converged
-        @async sequence_workers(wk_pool, permute_IPM, e, job_chan, model_chan)
+        for wk in wk_pool
+            @info "wk"
+            remote_do(println, wk, galilean_trajectory_sample!(e,job_chan,model_chan))
+            @info "jojojo"
+            remote_do(galilean_trajectory_sample!,wk,e,job_chan,model_chan)
+            @info "hehehehe"
+        end
+        #@async sequence_workers(wk_pool, galilean_trajectory_sample!, e, job_chan, model_chan)
     end
 
     meter = GMC_NS_Progress(e, tuner, 0.; start_it=curr_it, progargs...)
 
     while !converge_check(e, converge_factor) && (curr_it <= max_iterates)
-
-        #REMOVE OLD LEAST LIKELY MODEL - perform here to spare all workers the same calculations
-        e.contour, least_likely_idx = findmin([model.log_Li for model in e.models])
-        Li_model = e.models[least_likely_idx]
-        deleteat!(e.models, least_likely_idx)
-        e.sample_posterior && push!(e.retained_posterior_samples, Li_model)#if sampling posterior, push the model record to the ensemble's posterior samples vector
-
-        warn, step_report = nested_step!(e, model_chan, wk_mon, Li_model) #step the ensemble
+        warn, step_report = nested_step!(e, model_chan) #step the ensemble
         warn == 1 &&
                 (@error "All workers failed to find new models, aborting at current iterate."; return e) #if there is a warning, iust return the ensemble and print info
-        curr_it += 1
-        tune_weights!(tuner, step_report)
-        instruction = tuner.inst
-        take!(job_chan); put!(job_chan,(e.models,e.contour,instruction))
+        curr_it += 1        
+        
+        tune_τ!(tuner, step_report)
+
         backup[1] && curr_it%backup[2] == 0 && e_backup(e,tuner) #every backup interval, serialise the ensemble and instruction
-        clean[1] && !e.sample_posterior && curr_it%clean[2] == 0 && clean_ensemble_dir(e,clean[3]) #every clean interval, remove old discarded models
+        clean[1] &&  !e.sample_posterior && curr_it%clean[2] == 0 && clean_ensemble_dir(e,clean[3]) #every clean interval, remove old discarded models
 
         update!(meter, converge_check(e,converge_factor,vals=true)...)
     end
@@ -103,12 +103,17 @@ end
                 function evidence_converge(e, evidence_fraction; vals=false)
                     val=lps(findmax([model.log_Li for model in e.models])[1],  e.log_Xi[end])
                     thresh=lps(log(evidence_fraction),e.log_Zi[end])
+
+                    isinf(val)||isinf(thresh) && return false
+
                     vals ? (return val, thresh) : (return val<thresh)
                 end
 
                 function compress_converge(e, compression_ratio; vals=false)
                     val=findmax([model.log_Li for model in e.models])[1]-e.contour
                     thresh=compression_ratio
+
+                    isinf(val) && return false
                     vals ? (return val, thresh) : (return val<thresh)
                 end
 

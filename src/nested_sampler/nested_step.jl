@@ -5,7 +5,7 @@ Step and update ensemble e by sampling the e.contour-bounded prior mass via Gali
 
 """
 
-function nested_step!(e::GMC_NS_Ensemble,τ)
+function nested_step!(e::GMC_NS_Ensemble, t::τ_PID)
     N = length(e.models) #number of sample models/particles on the posterior surface
     i = length(e.log_Li) #iterate number, index for last values
     j = i+1 #index for newly pushed values
@@ -14,20 +14,20 @@ function nested_step!(e::GMC_NS_Ensemble,τ)
     Li_model = e.models[least_likely_idx]
 
     #SELECT NEW MODEL, SAVE TO ENSEMBLE DIRECTORY, CREATE RECORD AND PUSH TO ENSEMBLE
-    model_selected=false; report=falses(0);
+    model_selected=false; tune=!any(isinf,[m.log_Li for m in e.models])
     samples=0; sample_limit=Int64(floor(length(e.models)*e.GMC_exhaust_σ))
 
     while !model_selected && samples<=sample_limit
         m_record = rand(e.models)
         m = deserialize(m_record.path)
-        candidate=galilean_trajectory_sample!(m,e,τ)
+        candidate=galilean_trajectory_sample!(m,e,t.τ)
 
         if candidate.id==m.id #particle reversed rather than new sample
-            push!(report, false)
+            process_report!(t, false, tune)
             serialize(m_record.path,candidate)
             samples+=1
         else
-            push!(report, true)
+            process_report!(t, true, tune)
 
             model_selected=true
             candidate.id=e.model_counter
@@ -43,7 +43,7 @@ function nested_step!(e::GMC_NS_Ensemble,τ)
         end
     end
 
-    samples==sample_limit && (return 1, report)
+    samples==sample_limit && (return 1)
       
     #UPDATE ENSEMBLE QUANTITIES   
     push!(e.log_Li, minimum([model.log_Li for model in e.models])) #log likelihood of the least likely model - the current ensemble ll contour at Xi
@@ -57,7 +57,7 @@ function nested_step!(e::GMC_NS_Ensemble,τ)
             (exp(lps(e.log_Zi[i],-e.log_Zi[j])) * lps(e.Hi[i],e.log_Zi[i])), #term2
             -e.log_Zi[j])) #term3
 
-    return 0, report
+    return 0
 end
 
 function nested_step!(e::GMC_NS_Ensemble, model_chan::RemoteChannel)

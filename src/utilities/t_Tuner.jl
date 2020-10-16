@@ -1,11 +1,12 @@
-mutable struct τ_Tuner
+abstract type GMC_Tuner end
+
+mutable struct τ_Tuner <: GMC_Tuner
     τ::Float64
     τ_history::Vector{Float64}
-    min_acceptance::Float64
-    tune_rate::Float64
-    successes::BitVector #(memoryxfunc)
-    s_memory::Integer
-
+    α::Float64
+    β::Float64
+    a::BitVector
+    memory::Integer
 
     function τ_Tuner(τ1, e::GMC_NS_Ensemble)
         new(τ1,
@@ -17,16 +18,74 @@ mutable struct τ_Tuner
     end
 end
 
+mutable struct τ_PID <: GMC_Tuner
+    τ::Float64
+    τ_history::Vector{Float64}
+    α::Float64
+    β::Float64
+
+    a::BitVector 
+    a_history::BitVector
+    ℵ::Vector{Float64}
+    memory::Integer
+    Kp::Float64
+    Ki::Float64
+    Kd::Float64
+    
+    ϵ::Float64
+    pterm::Float64
+    iterm::Float64
+    dterm::Float64
+
+    function τ_PID(τ1, e::GMC_NS_Ensemble, Kp, Ki, Kd)
+        new(τ1,
+        zeros(0),
+        e.GMC_tune_α,
+        1.,
+        falses(0),
+        falses(0),
+        Vector{Float64}(),
+        e.GMC_tune_μ,Kp,Ki,Kd,0.,0.,0.,0.)
+    end
+end
+
+function process_report!(t::τ_PID, report::Bool, update::Bool)
+    push!(t.a_history, report)
+    length(t.a_history)>t.memory ? (t.a=t.a_history[end-t.memory:end]) : (t.a=t.a_history)
+    push!(t.ℵ,mean(t.a))
+    update && τ_update!(t)
+end
+
+function τ_update!(t::τ_PID)
+    push!(t.τ_history,t.τ)
+
+    t.ϵ=t.ℵ[end] - t.α
+    t.pterm=t.Kp * t.ϵ
+    !(t.τ==eps()) && (t.iterm+=(t.Ki * t.ϵ))
+
+    length(t.ℵ) > Int64(round(.1*t.memory)) ? (d = t.ℵ[end-Int64(round(.1*t.memory))] - t.ℵ[end]) : #d is positive if acceptance is declining- in this case want smaller beta and tau
+        d=0.
+    t.dterm=t.Kd * d
+
+    t.β=max(eps(), 1. + t.pterm + t.iterm - t.dterm)
+    t.τ=max(eps(), t.τ * t.β)
+end
+
+
 function init_tune(e::GMC_NS_Ensemble)
     @info "Performing initial GMC timestep tuning on ensemble..."
     τ=1.; tuned=false; τd=1.1; accept=1.; it=1
     while !tuned && it<e.GMC_tune_ι
         test_report=falses(0)
+        println(stdout, "τ: $τ, It: $it, Accept: $accept")
+
         while length(test_report)<Int64(floor(length(e.models)*e.GMC_tune_ρ))
             m=deserialize(rand([m.path for m in e.models]))
             candidate=galilean_trajectory_sample!(m,e,τ)
 
             candidate.id==m.id ? push!(test_report,0) : push!(test_report,1)
+            candidate=0
+            GC.gc()
         end
         
         last_accept=accept
@@ -45,29 +104,49 @@ function init_tune(e::GMC_NS_Ensemble)
         end
 
         it+=1
+        move_cursor_up_while_clearing_lines(stdout, 1)
     end
+    println("Done. τ=$τ")
     return τ
 end
 
 function tune_τ!(t::τ_Tuner, step_report::BitVector)
     push!(t.τ_history,t.τ)
-    t.successes=vcat(t.successes,step_report)
-    ls=length(t.successes)
-    ls>t.s_memory && (t.successes=t.successes[ls-t.s_memory:end])
+    t.a=vcat(t.a,step_report)
+    ls=length(t.a)
+    ls>t.memory && (t.a=t.a[ls-t.memory:end])
 
-    accept=sum(t.successes)/ls
+    accept=sum(t.a)/ls
     if accept==1.
-        t.τ=t.τ*(1+t.tune_rate)
-    elseif accept<t.min_acceptance
-        t.τ=t.τ*(1-t.tune_rate)
+        t.τ=t.τ*(1+t.β)
+    elseif accept<t.α
+        t.τ=t.τ*(1-t.β)
     end
 end
 
-function Base.show(io::IO, t::τ_Tuner; progress=false)
-    plot=lineplot(t.τ_history, title="τ History", xlabel="Iterate", color=:white, name="τ")
-    show(io, plot)
-    println()
-    println("τ:$(t.τ), α:$(t.min_acceptance), β:$(t.tune_rate)")
+function Base.show(io::IO, t::τ_PID; progress=false)
+    try
+        plot=lineplot(t.ℵ, title="Recent Proposal Acceptance", xlabel="Proposals", ylabel="Rate", color=:white, name="Accept rate")
 
-    progress && return nrows(plot.graphics)+7
+        lbls=plot.labels_left
+        (arrow="")
+        all(t.α .> [v for v in parse.(Float64,values(lbls))]) && (arrow="↑")
+        all(t.α .< [v for v in parse.(Float64,values(lbls))]) && (arrow="↓")
+
+        lineplot!(plot, [t.α for i in 1:length(t.ℵ)], name="α setpoint "*arrow, color=:red)
+        show(io, plot)
+        println()
+        printstyled("τ:$(t.τ), α:$(t.α), β:$(t.β)",bold=true)
+        println()
+        printstyled("Kp:$(t.Kp), Ki:$(t.Ki), Kd:$(t.Kd)",color=:green)
+        println()
+        printstyled("ptrm:$(t.pterm), itrm:$(t.iterm), dtrm:$(t.dterm)",color=:magenta)
+        println()
+
+
+        progress && return nrows(plot.graphics)+9
+    catch
+        printstyled("τ_PID NOT AVAILABLE. STANDBY", bold=true)
+        progress && return 1
+    end
 end

@@ -17,7 +17,7 @@ mutable struct GMC_NS_Progress{T<:Real} <: AbstractProgress
     offset::Integer             # position offset of progress bar (default is 0)
 
     e::GMC_NS_Ensemble
-    tuner::τ_Tuner
+    tuner::GMC_Tuner
     top_m::GMC_NS_Model    
 
     mean_stp_time::AbstractFloat
@@ -33,7 +33,7 @@ mutable struct GMC_NS_Progress{T<:Real} <: AbstractProgress
 
     function GMC_NS_Progress{T}(e::GMC_NS_Ensemble,
                                top_m::GMC_NS_Model,
-                               tuner::τ_Tuner,
+                               tuner::GMC_Tuner,
                                interval::T;
                                dt::Real=0.1,
                                desc::AbstractString="Nested Sampling::",
@@ -75,7 +75,7 @@ mutable struct GMC_NS_Progress{T<:Real} <: AbstractProgress
     end
 end
 
-function GMC_NS_Progress(e::GMC_NS_Ensemble, tuner::τ_Tuner, interval::Real; dt::Real=0.1, desc::AbstractString="GMC-NS::", color::Symbol=:green, output::IO=stderr, offset::Integer=0, start_it::Integer=1, upper_displays::AbstractVector{<:AbstractVector{Function}}, lower_displays::AbstractVector{<:AbstractVector{Function}}, disp_rot_its::Integer)
+function GMC_NS_Progress(e::GMC_NS_Ensemble, tuner::GMC_Tuner, interval::Real; dt::Real=0.1, desc::AbstractString="GMC-NS::", color::Symbol=:green, output::IO=stderr, offset::Integer=0, start_it::Integer=1, upper_displays::AbstractVector{<:AbstractVector{Function}}, lower_displays::AbstractVector{<:AbstractVector{Function}}, disp_rot_its::Integer)
     top_m = deserialize(e.models[findmax([model.log_Li for model in e.models])[2]].path)
     
     return GMC_NS_Progress{typeof(interval)}(e, top_m, tuner, interval, dt=dt, desc=desc, color=color, output=output, offset=offset, start_it=start_it, upper_displays=upper_displays, lower_displays=lower_displays, disp_rot_its=disp_rot_its)

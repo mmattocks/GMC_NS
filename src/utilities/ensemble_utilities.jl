@@ -4,7 +4,7 @@ function ensemble_history(e::GMC_NS_Ensemble, bins=25)
     show(histogram(livec, nbins=bins))
 end
 
-function e_backup(e::GMC_NS_Ensemble, tuner::τ_Tuner)
+function e_backup(e::GMC_NS_Ensemble, tuner::GMC_Tuner)
     serialize(string(e.path,'/',"ens"), e)
     serialize(string(e.path,'/',"tuner"), tuner)
 end
@@ -127,6 +127,14 @@ function show_models(e::GMC_NS_Ensemble,idxs)
     for idx in idxs
         m=deserialize(e.models[liperm[idx]].path)
         show(m)
+    end
+end
+
+function show_models_e(e::GMC_NS_Ensemble,idxs)
+    liperm=sortperm([model.log_Li for model in e.models],rev=true)
+    for idx in idxs
+        m=deserialize(e.models[liperm[idx]].path)
+        show(stdout,m,e)
     end
 end
 

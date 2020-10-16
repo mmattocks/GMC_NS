@@ -21,14 +21,15 @@ Finally, if reflection fails to produce a new particle inside the contour, inver
 
 """
 function galilean_trajectory_sample!(m, e, τ)
-    e.GMC_timestep_η > 0. && (τ+=rand(Normal(0,τ*e.GMC_timestep_η)))#perturb τ if specified
-    d=τ*m.v #distance vector for given timestep
+    e.GMC_timestep_η > 0. && (τ=max(τ+rand(Normal(0,τ*e.GMC_timestep_η)),eps()))#perturb τ if specified
+    d=τ*m.v.*normalize(m.θ) #distance vector for given timestep
     new_m=e.model_initλ(0, m.id, m.θ+d, m.v, e.obs, e.constants...) #try to proceed along distance vector
     if new_m.log_Li <= e.contour #if that didnt work
-        lhδ=max(eps(Float64),lps(m.log_Li,-new_m.log_Li)) #get the lhδ between the two points or eps as a floor (prevents NaN n)
+        lhδ=lps(m.log_Li,-new_m.log_Li) #get the lhδ between the two points
         n=boundary_norm(d,lhδ) #get the gradient normal for the distance and lhδ
         v′=reflect(m.v,n,e.GMC_reflect_η) #get the reflected velocity vector off the boundary
-        rd=τ*v′ #reflected distance given the timestep
+        rd=τ*v′.*normalize(m.θ) #reflected distance given the timestep
+
         new_m=e.model_initλ(0, m.id, m.θ+d+rd, v′, e.obs, e.constants...)
 
         if new_m.log_Li <= e.contour #if reflection fails
@@ -39,7 +40,11 @@ function galilean_trajectory_sample!(m, e, τ)
 end
 
                 function boundary_norm(v, lhδ)
-                    return normalize([lhδ/vi for vi in v])
+                    b=[lhδ/vi for vi in v]
+                    b[b.==Inf].=prevfloat(Inf) #rectify invalid vals
+                    b[b.==0.].=rand([nextfloat(0.),prevfloat(0.)])
+                    b[b.==-Inf].=nextfloat(-Inf)  
+                    return normalize(b)
                 end
 
                 function reflect(v, n, η)
@@ -50,8 +55,6 @@ end
                 function r_perturb(v′, η)
                     return v′*cos(η) + rand(MvNormal(length(v′),1.))*sin(η)
                 end
-
-
 
 """
 galilean_trajectory_sample(e<:GMC_NS_Ensemble, job_chan::RemoteChannel{Tuple{<:AbstractVector{<:GMC_NS_Model_Record},Float64,Float64}, model_chan::RemoteChannel{Channel{<:GMC_NS_Model}})
@@ -77,7 +80,10 @@ Finally, if reflection fails to produce a new particle inside the contour, inver
 After sampling in this manner, update the model record vector, contour, and τ from the job channel, repeating until converge_ensemble passes a 0. for τ.
 
 """            
-function galilean_trajectory_sample!(e, job_chan::RemoteChannel, model_chan::RemoteChannel)
+ function galilean_trajectory_sample!(e, job_chan::RemoteChannel, model_chan::RemoteChannel)
+    println("woo")
+    #put!(comms_chan,myid())
+    #println(myid())
     while true
         wait(job_chan)
         e.models, e.contour, τ = fetch(job_chan) #update quantities from job channel
@@ -85,16 +91,21 @@ function galilean_trajectory_sample!(e, job_chan::RemoteChannel, model_chan::Rem
 
         m_record = rand(e.models) #randomly select a model from the ensemble model records vec
         m = (remotecall_fetch(deserialize,1,m_record.path)) # get the model at the record path
-
-        e.GMC_timestep_η > 0. && (τ+=rand(Normal(0,τ*e.GMC_timestep_η))) #perturb τ if specified
+        println("hehe")
+    e.GMC_timestep_η > 0. && (τ=max(τ+rand(Normal(0,τ*e.GMC_timestep_η)),eps()))#perturb τ if specified
         d=τ*m.v #distance vector for given timestep
 
+        println("quo")
         new_m=e.model_initλ(0, m.id, m.θ+d, m.v, e.obs, e.constants...) #try to proceed along distance vector
         if new_m.log_Li <= e.contour #if that didnt work
-            lhδ=m.log_Li-new_m.log_Li #get the lhδ between the two points
+            lhδ=lps(m.log_Li,-new_m.log_Li) #get the lhδ between the two points
             n=boundary_norm(d,lhδ) #get the gradient normal for the distance and lhδ
+            println("lhδ $lhδ n $n")
+
             v′=reflect(m.v,n,e.GMC_reflect_η) #get the reflected velocity vector off the imputed boundary
             rd=τ*v′ #reflected distance given the timestep
+
+            println(m.θ+d+rd)
             new_m=e.model_initλ(0, m.id, m.θ+d+rd, v′, e.obs, e.constants...) #calculate a reflected model
 
             if new_m.log_Li <= e.contour #if reflection fails

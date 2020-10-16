@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [deps]
 BioBackgroundModels = "71d2fffc-6959-458e-9716-bd512c1bc899"
+BioMotifInference = "23206ec3-a6aa-4a79-a7c0-9e85de80e56b"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"

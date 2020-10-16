@@ -76,6 +76,14 @@ git-tree-sha1 = "57deb413ca9f4c8bc7d4c6e98ebe217ff728c737"
 uuid = "47718e42-2ac5-11e9-14af-e5595289c2ea"
 version = "0.1.0"
 
+[[BioMotifInference]]
+deps = ["BioBackgroundModels", "BioSequences", "DataFrames", "Distances", "Distributed", "Distributions", "Printf", "ProgressMeter", "Random", "Serialization", "StatsFuns", "UnicodePlots"]
+git-tree-sha1 = "4bebcef55dd01cac58abbf89406b13ff6ccccb32"
+repo-rev = "master"
+repo-url = "https://github.com/mmattocks/BioMotifInference.jl"
+uuid = "23206ec3-a6aa-4a79-a7c0-9e85de80e56b"
+version = "0.3.12"
+
 [[BioSequences]]
 deps = ["BioGenerics", "BioSymbols", "Combinatorics", "IndexableBitVectors", "Printf", "Random", "StableRNGs", "Twiddle"]
 git-tree-sha1 = "093ccb9211bdc71924abf8e74a0790af11da35a7"
