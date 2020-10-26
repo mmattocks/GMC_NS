@@ -54,9 +54,15 @@ function Base.show(io::IO, e::GMC_NS_Ensemble; progress=false)
 	maxLH=maximum(livec)
 	printstyled(io, "$(typeof(e)) @ $(e.path)\n", bold=true)
 	msg = @sprintf "Contour: %3.6e MaxLH:%3.3e log Evidence:%3.6e" e.contour maxLH e.log_Zi[end]
-	println(io, msg)
-	hist=UnicodePlots.histogram(livec, title="Ensemble Likelihood Distribution")
-	show(io, hist)
-	println()
-	progress && return(nrows(hist.graphics)+6)
+    println(io, msg)
+    try
+        hist=UnicodePlots.histogram(livec, title="Ensemble Likelihood Distribution")
+        show(io, hist)
+        println()
+        progress && return(nrows(hist.graphics)+6)
+    catch
+        printstyled("HISTOGRAM UNAVAILABLE", color=:green)
+        println()
+        progress && return 4
+    end
 end

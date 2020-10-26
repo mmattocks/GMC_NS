@@ -16,8 +16,9 @@ abstract type GMC_NS_Model_Record end
 Abstract supertype for models in 'GMC_NS_Ensemble's. Subtyped model structs must implement the following fields as their interface with 'GMC_NS':
 
     mutable struct Minimal_Model
-        id::Integer #id integer assigned at construction
-        origin::Integer #id of parent model, if any
+        trajectory::Integer #id assigned at construction, identifies trajectory
+        i::Integer #id integer assigned at construction, identifies position on trajectory
+        
 
         θ::Vector{<:AbstractFloat} #model's parameter Vector
         v::Vector{<:AbstractFloat} #model's velocity in parameter space

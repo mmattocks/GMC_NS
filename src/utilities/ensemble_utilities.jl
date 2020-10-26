@@ -4,7 +4,7 @@ function ensemble_history(e::GMC_NS_Ensemble, bins=25)
     show(histogram(livec, nbins=bins))
 end
 
-function e_backup(e::GMC_NS_Ensemble, tuner::GMC_Tuner)
+function e_backup(e::GMC_NS_Ensemble, tuner::Dict{Int64,<:GMC_Tuner})
     serialize(string(e.path,'/',"ens"), e)
     serialize(string(e.path,'/',"tuner"), tuner)
 end
@@ -57,11 +57,11 @@ function move_ensemble!(e::GMC_NS_Ensemble,path::String)
     end
 
     for (n,model) in enumerate(e.models)
-        e.models[n]=Model_Record(path*'/'*basename(model.path), model.log_Li)
+        e.models[n]=typeof(e.models[1])(path*'/'*basename(model.path), model.log_Li)
     end
     if e.sample_posterior
         for (n,model) in enumerate(e.posterior_samples)
-            e.posterior_samples[n]=Model_Record(path*'/'*basename(model.path), model.log_Li)
+            e.posterior_samples[n]=typeof(e.models[1])(path*'/'*basename(model.path), model.log_Li)
         end
     end
 

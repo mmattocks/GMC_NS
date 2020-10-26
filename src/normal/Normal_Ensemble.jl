@@ -35,8 +35,8 @@ end
 Normal_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractFloat}, priors::AbstractVector{<:Distribution}, GMC_settings...; sample_posterior::Bool=true) =
 Normal_Ensemble(
     path,
-    construct_normal,
-    assemble_NMs(path, no_models, obs, priors)...,
+    construct_normal_model,
+    assemble(construct_normal_model, construct_normal_record, path, no_models, obs, priors,Vector{Real}())...,
     [-Inf], #L0 = 0
 	[0.], #ie exp(0) = all of the prior is covered
 	[-Inf], #w0 = 0
@@ -51,37 +51,6 @@ Normal_Ensemble(
     GMC_settings...,
 	no_models+1)
 
-function assemble_NMs(path::String, no_models::Integer, obs, priors)
-	ensemble_records = Vector{Normal_Record}()
-	!isdir(path) && mkpath(path)
-
-    for model_no in 1:no_models
-		model_path = string(path,'/',model_no)
-        if !isfile(model_path)
-            θvec=sample_θvec(priors)
-			model = Normal_Model(model_no, 0, θvec, [0.], obs; v_init=true)
-			serialize(model_path, model) #save the model to the ensemble directory
-			push!(ensemble_records, Normal_Record(model_path,model.log_Li))
-		else #interrupted assembly pick up from where we left off
-			model = deserialize(model_path)
-			push!(ensemble_records, Normal_Record(model_path,model.log_Li))
-		end
-	end
-
-	return ensemble_records, minimum([record.log_Li for record in ensemble_records])
-end
-
-                function sample_θvec(priors)
-                    θvec=zeros(0)
-                    for prior in priors
-                        sample=rand(prior)
-                        for val in sample
-                            push!(θvec,val)
-                        end
-                    end
-                    return θvec
-                end
-
 function Base.show(io::IO, m::Normal_Model, e::Normal_Ensemble; xsteps=100, progress=true)
     μ,σ=m.θ
     n=Normal(μ,σ)
@@ -95,12 +64,12 @@ function Base.show(io::IO, m::Normal_Model, e::Normal_Ensemble; xsteps=100, prog
 
     xlims=(min(minimum(e.obs),minimum(X)),max(maximum(e.obs),maximum(X)))
 
-    plt=lineplot(X,y,xlabel="X",ylabel="p",title="Normal Model $(m.id)", name="Model", xlim=xlims)
+    plt=lineplot(X,y,xlabel="X",ylabel="p",title="Normal Model $(m.trajectory).$(m.i), log_Li $(m.log_Li)", name="Model", xlim=xlims)
     scatterplot!(plt, e.obs, scattery, name="Obs")
 
     show(io, plt)
-    println()
-    println("Origin: $(m.origin)")
+    println() 
+    println("θ: $(m.θ)")
     println("v: $(m.v)")
 
     progress && return nrows(plt.graphics)+8

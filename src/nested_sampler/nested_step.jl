@@ -5,41 +5,26 @@ Step and update ensemble e by sampling the e.contour-bounded prior mass via Gali
 
 """
 
-function nested_step!(e::GMC_NS_Ensemble, t::τ_PID)
+function nested_step!(e::GMC_NS_Ensemble, tuners::Dict{Int64,τ_PID})
     N = length(e.models) #number of sample models/particles on the posterior surface
     i = length(e.log_Li) #iterate number, index for last values
     j = i+1 #index for newly pushed values
 
     e.contour, least_likely_idx = findmin([model.log_Li for model in e.models])
     Li_model = e.models[least_likely_idx]
+    m = deserialize(Li_model.path)
+    t=tuners[Li_model.trajectory]
 
     #SELECT NEW MODEL, SAVE TO ENSEMBLE DIRECTORY, CREATE RECORD AND PUSH TO ENSEMBLE
-    model_selected=false; tune=!any(isinf,[m.log_Li for m in e.models])
-    samples=0; sample_limit=Int64(floor(length(e.models)*e.GMC_exhaust_σ))
+    model_selected=false
+    samples=1; sample_limit=Int64(floor(length(e.models)*e.GMC_exhaust_σ))
 
     while !model_selected && samples<=sample_limit
-        m_record = rand(e.models)
-        m = deserialize(m_record.path)
-        candidate=galilean_trajectory_sample!(m,e,t.τ)
-
-        if candidate.id==m.id #particle reversed rather than new sample
-            process_report!(t, false, tune)
-            serialize(m_record.path,candidate)
-            samples+=1
+        t.τ > e.GMC_τ_death ? (resample=false) : (resample=true)
+        if !resample
+            model_selected=galilean_search!(m,e,t,least_likely_idx,samples,sample_limit)
         else
-            process_report!(t, true, tune)
-
-            model_selected=true
-            candidate.id=e.model_counter
-            
-            deleteat!(e.models, least_likely_idx) #remove least likely model record
-            e.sample_posterior && push!(e.posterior_samples, Li_model)#if sampling posterior, push the model record to the ensemble's posterior samples vector
-
-            new_model_record = typeof(e.models[1])(string(e.path,'/',e.model_counter), candidate.log_Li)
-            push!(e.models, new_model_record) #insert new model record
-            serialize(new_model_record.path, candidate)
-
-            e.model_counter +=1
+            model_selected=ellipsoid_resample!(e,tuners,least_likely_idx,samples,sample_limit)
         end
     end
 

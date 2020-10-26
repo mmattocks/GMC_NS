@@ -37,19 +37,21 @@ mutable struct τ_PID <: GMC_Tuner
     iterm::Float64
     dterm::Float64
 
-    function τ_PID(τ1, e::GMC_NS_Ensemble, Kp, Ki, Kd)
-        new(τ1,
+    function τ_PID(e::GMC_NS_Ensemble)
+        new(e.GMC_init_τ,
         zeros(0),
         e.GMC_tune_α,
         1.,
         falses(0),
         falses(0),
         Vector{Float64}(),
-        e.GMC_tune_μ,Kp,Ki,Kd,0.,0.,0.,0.)
+        e.GMC_tune_μ,
+        e.GMC_tune_PID...,
+        0.,0.,0.,0.)
     end
 end
 
-function process_report!(t::τ_PID, report::Bool, update::Bool)
+function process_report!(t::τ_PID, report::Bool, update::Bool=true)
     push!(t.a_history, report)
     length(t.a_history)>t.memory ? (t.a=t.a_history[end-t.memory:end]) : (t.a=t.a_history)
     push!(t.ℵ,mean(t.a))
@@ -126,7 +128,7 @@ end
 
 function Base.show(io::IO, t::τ_PID; progress=false)
     try
-        plot=lineplot(t.ℵ, title="Recent Proposal Acceptance", xlabel="Proposals", ylabel="Rate", color=:white, name="Accept rate")
+        plot=lineplot(t.ℵ, title="Recent Unobstructed Moves", xlabel="Proposals", ylabel="Rate", color=:white, name="Free moves")
 
         lbls=plot.labels_left
         (arrow="")
@@ -149,4 +151,12 @@ function Base.show(io::IO, t::τ_PID; progress=false)
         printstyled("τ_PID NOT AVAILABLE. STANDBY", bold=true)
         progress && return 1
     end
+end
+
+function get_tuner_dict(e)
+    d=Dict{Int64,τ_PID}()
+    for rec in e.models
+        d[rec.trajectory]=τ_PID(e)
+    end
+    return d
 end
