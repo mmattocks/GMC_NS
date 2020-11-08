@@ -14,7 +14,7 @@ module GMC_NS
 
     #[GMC_τ_death, GMC_init_τ, GMC_tune_μ, GMC_tune_α, GMC_tune_PID, GMC_timestep_η, GMC_reflect_η, GMC_exhaust_σ]
 
-    GMC_DEFAULTS=Vector{Any}([5e-6,.3, 50,.9,(.2,1e-5,.1), .001, .01, 10.])
+    GMC_DEFAULTS=Vector{Any}([50,1e-6,.5, 50,.8,(.175,1e-5,.1), .001, .01, 10.])
     export GMC_DEFAULTS
 
     include("ensemble/GMC_NS_Ensemble.jl")

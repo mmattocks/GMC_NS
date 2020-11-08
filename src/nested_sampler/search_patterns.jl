@@ -36,12 +36,11 @@ function ellipsoid_resample!(e,tdict,llidx,samples,s_limit)
         return true
     else
         move_cursor_up_while_clearing_lines(stdout,1)
-        @warn "Ellipsoid resample failure!"
+        @info "Ellipsoid resample failure!"
         move_cursor_up_while_clearing_lines(stdout,1)
         return false
     end
 end
-
 
 function galilean_search!(m,e,t,llidx,samples,s_limit)
     candidate=galilean_trajectory_sample!(m,e,t)
@@ -73,6 +72,57 @@ function galilean_search!(m,e,t,llidx,samples,s_limit)
     else
         move_cursor_up_while_clearing_lines(stdout,1)
         @info "†"
+        move_cursor_up_while_clearing_lines(stdout,1)
+        return false
+    end
+end
+
+function diffusion_search(e, tuners, llidx, sample_limit, τ_limit)
+    sample=0; model_selected=false; new_m=0; src_traj=0
+    @info "Diffusion resample"
+    while !(sample > sample_limit) && !model_selected
+        move_cursor_up_while_clearing_lines(stdout,1)
+
+        sample +=1
+        mrec=rand(e.models)
+        model=deserialize(mrec.path)
+        randdir=rand(MvNormal(length(model.θ),1.))
+        τ=tuners[model.trajectory].τ
+        @info "Diffusion resample $(sample) from $(model.trajectory) with τ $τ"
+        new_pos=model.pos+randdir*τ
+        box_bound!(new_pos,e.box)
+        new_m=e.model_initλ(e.t_counter, 1, to_prior.(new_pos,e.priors), new_pos, randdir, e.obs, e.constants...)
+
+        while τ*.7>τ_limit && new_m.log_Li<e.contour
+            τ*=.7
+            move_cursor_up_while_clearing_lines(stdout,1)
+            @info "Diffusion resample $(sample) from $(model.trajectory) with τ $τ"
+            randdir=rand(MvNormal(length(model.θ),1.))
+            new_pos=model.pos+randdir*τ
+            box_bound!(new_pos,e.box)
+            new_m=e.model_initλ(e.t_counter, 1, to_prior.(new_pos,e.priors), new_pos, randdir, e.obs, e.constants...)
+        end
+
+        new_m.log_Li > e.contour && (model_selected=true; src_traj=model.trajectory)
+    end
+
+    if new_m.log_Li > e.contour
+        move_cursor_up_while_clearing_lines(stdout,1)
+        @info "Found"
+        e.sample_posterior && push!(e.posterior_samples, e.models[llidx])#if sampling posterior, push the model record to the ensemble's posterior samples vector
+        deleteat!(e.models, llidx) #remove least likely model record
+
+        new_model_record = typeof(e.models[1])(new_m.trajectory,new_m.i, new_m.pos, string(e.path,'/',new_m.trajectory,'.',new_m.i), new_m.log_Li)
+        push!(e.models, new_model_record) #insert new model record
+        serialize(new_model_record.path, new_m)
+        tuners[e.t_counter]=τ_PID(e)
+        tuners[e.t_counter].τ=tuners[src_traj].τ
+        e.t_counter +=1
+        move_cursor_up_while_clearing_lines(stdout,1)
+        return true
+    else
+        move_cursor_up_while_clearing_lines(stdout,1)
+        @info "Diffusion resample failure!"
         move_cursor_up_while_clearing_lines(stdout,1)
         return false
     end

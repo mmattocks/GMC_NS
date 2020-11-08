@@ -5,10 +5,15 @@ function tuning_display(p)
 end
 
 function convergence_display(p)
-    ciplot=lineplot([p.counter-(length(p.convergence_history)-1):p.counter...], p.convergence_history, title="Convergence Interval Recent History", xlabel="Iterate",ylabel="CI", color=:yellow)
-    lines=nrows(ciplot.graphics)+5
-    show(p.output, ciplot); println()
-    return lines
+    try
+        ciplot=lineplot([p.counter-(length(p.convergence_history)-1):p.counter...], p.convergence_history, title="Convergence Interval Recent History", xlabel="Iterate",ylabel="CI", color=:yellow)
+        lines=nrows(ciplot.graphics)+5
+        show(p.output, ciplot); println()
+        return lines
+    catch
+        printstyled(p.output, "CONVERGENCE PLOT UNAVAILABLE. STANDBY\n", bold=true, color=:yellow); println()
+        return 2
+    end
 end
 
 function evidence_display(p)
@@ -19,7 +24,7 @@ function evidence_display(p)
         return lines
     catch
         printstyled(p.output, "EVIDENCE PLOT UNAVAILABLE. STANDBY\n", bold=true, color=:red); println()
-        return 1
+        return 2
     end
 end
     
@@ -31,7 +36,7 @@ function info_display(p)
         return lines
     catch
         printstyled(p.output, "INFORMATION PLOT UNAVAILABLE. STANDBY\n", bold=true, color=:green); println()
-        return 1
+        return 2
     end
 end
 
@@ -43,7 +48,7 @@ function lh_display(p)
         return lines
     catch
         printstyled(p.output, "CONTOUR HISTORY UNAVAILABLE. STANDBY\n", bold=true, color=:magenta); println()
-        return 1
+        return 2
     end
 end
 
@@ -55,7 +60,7 @@ function liwi_display(p)
         return lines
     catch
         printstyled(p.output, "EVIDENTIARY HISTORY UNAVAILABLE. STANDBY\n", bold=true, color=:cyan); println()
-        return 1
+        return 2
     end
 end
 
