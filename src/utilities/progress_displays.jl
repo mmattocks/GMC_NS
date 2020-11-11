@@ -69,11 +69,21 @@ function ensemble_display(p)
 end
 
 function model_display(p)
-    println("Current MAP model:")
-    return lines=show(p.output, p.top_m, progress=true)
+    try
+        println("Current MAP model:")
+        return lines=show(p.output, p.top_m, progress=true)
+    catch
+        printstyled(p.output, "MODEL DISPLAY UNAVAILABLE\n", bold=true, color=:blue); println()
+        return 3
+    end
 end
 
 function model_obs_display(p)
-    println("Current MAP model")
-    return lines=show(p.output, p.top_m, p.e, progress=true)
+    try
+        println("Current MAP model")
+        return lines=show(p.output, p.top_m, p.e, progress=true)
+    catch
+        printstyled(p.output, "MODEL DISPLAY UNAVAILABLE\n", bold=true, color=:blue); println()
+        return 3
+    end
 end

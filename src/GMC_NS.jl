@@ -7,10 +7,11 @@ module GMC_NS
     import Serialization: serialize, deserialize
     import LinearAlgebra: dot, normalize
     import BioBackgroundModels: lps
-    import BioMotifInference: sequence_workers
     import StatsFuns: logaddexp, logsumexp
     import Base: show
     import Measurements: measurement
+    import NGRefTools: marginals
+    import ConjugatePriors: NormalGamma
 
     #[GMC_τ_death, GMC_init_τ, GMC_tune_μ, GMC_tune_α, GMC_tune_PID, GMC_timestep_η, GMC_reflect_η, GMC_exhaust_σ]
 
@@ -19,8 +20,6 @@ module GMC_NS
 
     include("ensemble/GMC_NS_Ensemble.jl")
     export GMC_NS_Ensemble
-    include("ensemble/assemble.jl")
-    export assemble
     include("GMC_NS_Model.jl")
     export GMC_NS_Model, GMC_NS_Model_Record
     include("GMC/galilean_trajectory.jl")

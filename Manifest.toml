@@ -148,6 +148,12 @@ git-tree-sha1 = "f3955eb38944e5dd0fabf8ca1e267d94941d34a5"
 uuid = "a33af91c-f02d-484b-be07-31d278c5ca2b"
 version = "0.1.0"
 
+[[ConjugatePriors]]
+deps = ["Distributions", "LinearAlgebra", "PDMats", "SpecialFunctions", "Statistics", "StatsFuns"]
+git-tree-sha1 = "bcfc470f3aca36a78c1736fbfe669406e2327ea6"
+uuid = "1624bea9-42b1-5fc1-afd3-e96f729c8d6c"
+version = "0.4.0"
+
 [[ConsoleProgressMonitor]]
 deps = ["Logging", "ProgressMeter"]
 git-tree-sha1 = "3ab7b2136722890b9af903859afcf457fa3059e8"
@@ -394,6 +400,14 @@ version = "0.4.4"
 
 [[Mmap]]
 uuid = "a63ad114-7e13-5084-954f-fe012c677804"
+
+[[NGRefTools]]
+deps = ["ConjugatePriors", "Distributions"]
+git-tree-sha1 = "36697dcf9a0924f9f91b63c24bfda6b84f0ae253"
+repo-rev = "master"
+repo-url = "https://github.com/mmattocks/NGRefTools.jl"
+uuid = "1b89f441-c1fd-4480-9e82-cf849a5cdb22"
+version = "0.1.1"
 
 [[NaturalSort]]
 git-tree-sha1 = "eda490d06b9f7c00752ee81cfa451efe55521e21"

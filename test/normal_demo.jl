@@ -1,15 +1,20 @@
-using GMC_NS, Distributions, ConjugatePriors, ProgressMeter, Serialization
-
-import GMC_NS:Normal_Model,Normal_Ensemble
+using GMC_NS, Distributions, ConjugatePriors
 
 sample_dist=Normal(100.,5.)
 samples=rand(sample_dist, 10000)
 
-prior=NormalGamma(300,1,1,.1) #a lousy prior
+prior=NormalGamma(300.,2e-3,1.,10.) #a lousy prior
 
-e=Normal_Ensemble("NE_test", 300, samples, [prior], GMC_DEFAULTS...)
+box=[0. 1000.
+     1/1000. 1/eps()]
 
-uds=Vector{Vector{Function}}([[tuning_display],[convergence_display],[evidence_display],[info_display]])
+gmc=GMC_DEFAULTS
+gmc[1]=5
+gmc[2]=1.e-15
+
+e=Normal_Ensemble("NE_test", 10, samples, prior, box, gmc...)
+
+uds=Vector{Vector{Function}}([[convergence_display],[evidence_display],[info_display]])
 
 lds=Vector{Vector{Function}}([[model_obs_display]])
 

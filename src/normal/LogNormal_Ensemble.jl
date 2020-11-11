@@ -15,28 +15,31 @@ mutable struct LogNormal_Ensemble <: GMC_NS_Ensemble
     obs::Vector{Float64}
     priors::Vector{<:Distribution}
     constants::Vector{<:Real}
+    box::Matrix{Float64}
 
     sample_posterior::Bool
     posterior_samples::Vector{Normal_Record}
 
-    GMC_tune_ι::Int64
-    GMC_tune_ρ::Float64
+    GMC_Nmin::Int64
+
+    GMC_τ_death::Float64
+    GMC_init_τ::Float64
     GMC_tune_μ::Int64
     GMC_tune_α::Float64
-    GMC_tune_β::Float64
+    GMC_tune_PID::NTuple{3,Float64}
 
     GMC_timestep_η::Float64
     GMC_reflect_η::Float64
     GMC_exhaust_σ::Float64
 
-    model_counter::Int64
+    t_counter::Int64
 end
 
-LogNormal_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractFloat}, priors::AbstractVector{<:Distribution}, GMC_settings...; sample_posterior::Bool=true) =
+LogNormal_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractFloat}, prior, box, GMC_settings...; sample_posterior::Bool=true) =
 LogNormal_Ensemble(
     path,
     construct_lognormal_model,
-    assemble(construct_lognormal_model, construct_normal_record, path, no_models, obs, priors,Vector{Real}())...,
+    assemble_lNMs(path, no_models, obs, prior, box, Vector{Real}())...,
     [-Inf], #L0 = 0
 	[0.], #ie exp(0) = all of the prior is covered
 	[-Inf], #w0 = 0
@@ -44,15 +47,17 @@ LogNormal_Ensemble(
 	[-1e300], #Z0 = 0
 	[0.], #H0 = 0,
     obs,
-    priors,
+    length(prior)==1 ? ([GMC_NS.marginals(prior)...]) : (prior),
     Vector{Real}(),
+    length(prior)==1 ? (to_unit_ball.(box,[GMC_NS.marginals(prior)...])) : (to_unit_ball.(box,prior)),
     sample_posterior,
     Vector{Normal_Record}(),
     GMC_settings...,
 	no_models+1)
 
 function Base.show(io::IO, m::LogNormal_Model, e::LogNormal_Ensemble; xsteps=100, progress=true)
-    μ,σ=m.θ
+    μ,λ=m.θ
+    σ=sqrt(1/λ)
     n=LogNormal(μ,σ)
     X=[quantile(n,.025):(quantile(n,.975)-quantile(n,.025))/xsteps:quantile(n,.975)...]
     y=pdf.(n,X)
@@ -73,4 +78,31 @@ function Base.show(io::IO, m::LogNormal_Model, e::LogNormal_Ensemble; xsteps=100
     println("v: $(m.v)")
 
     progress && return nrows(plt.graphics)+8
+end
+
+function assemble_lNMs(path::String, no_trajectories::Integer, obs, prior, box, constants)
+	ensemble_records = Vector{Normal_Record}()
+    !isdir(path) && mkpath(path)
+    length(prior)==1 ? (marginals=[GMC_NS.marginals(prior)...]) : (marginals=prior)
+    box=to_unit_ball.(box,marginals)
+
+    @showprogress 1 "Assembling log-Normal Model ensemble..." for trajectory_no in 1:no_trajectories
+		model_path = string(path,'/',trajectory_no,'.',1)
+        if !isfile(model_path)
+            proposal=[rand.(prior)...]
+            pos=to_unit_ball.(proposal,marginals)
+            box_bound!(pos,box)
+            θvec=to_prior.(pos,marginals)
+
+            model = LogNormal_Model(trajectory_no, 1, θvec, pos, [0.], obs, constants...; v_init=true)
+            
+			serialize(model_path, model) #save the model to the ensemble directory
+			push!(ensemble_records, Normal_Record(trajectory_no,1,pos,model_path,model.log_Li))
+		else #interrupted assembly pick up from where we left off
+			model = deserialize(model_path)
+			push!(ensemble_records, Normal_Record(trajectory_no,1,model.pos,model_path,model.log_Li))
+		end
+	end
+
+	return ensemble_records, minimum([record.log_Li for record in ensemble_records])
 end

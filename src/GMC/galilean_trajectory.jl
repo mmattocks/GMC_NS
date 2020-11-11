@@ -28,6 +28,11 @@ function galilean_trajectory_sample!(m, e, tuner)
     box_rflct=false
     fwd_pos,adj_d=box_move(m.pos,d,e.box)
     isapprox(fwd_pos,m.pos)&&(box_rflct=true)
+
+    # println(e.box)
+    # println(m.pos)
+    # println(d)
+    # println(fwd_pos)
     
     !box_rflct ? (new_m=e.model_initλ(t, i, to_prior.(fwd_pos,e.priors), fwd_pos, m.v, e.obs, e.constants...)) : (new_m=m) #try to proceed along distance vector
 
@@ -74,9 +79,11 @@ end
                 function box_move(pos,d,box)
                     if !(all(box[:,1].<pos+d.<box[:,2]))
                         b=isapprox.(pos,box)
+                        pos[b[:,1]].=box[b[:,1],1]
+                        pos[b[:,2]].=box[b[:,2],2]
                         boundary_d=box.-pos
                         boundary_t=boundary_d./d
-                        boundary_t[b].=eps()
+                        #boundary_t[b].=eps()
                         first_b_idx=findfirst(isequal(minimum(boundary_t[findall(x->x>=0.,boundary_t)])),boundary_t)
                         first_b_d=boundary_d[first_b_idx]
                         d=d.*(first_b_d/d[first_b_idx[1]])
