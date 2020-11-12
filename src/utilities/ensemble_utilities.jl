@@ -17,7 +17,7 @@ function clean_ensemble_dir(e::GMC_NS_Ensemble, model_pad::Integer; ignore_warn=
 end
 
 function complete_evidence(e::GMC_NS_Ensemble)
-    return final_logZ = logaddexp(e.log_Zi[end], (logsumexp([model.log_Li for model in e.models]) +  e.log_Xi[length(e.log_Li)] - log(length(e.models))))
+    return final_logZ = logaddexp(e.log_Zi[end], (logsumexp([model.log_Li for model in e.models] .+  (e.log_Xi[length(e.log_Li)] - log(length(e.models))))))
 end
 
 function reset_ensemble!(e::GMC_NS_Ensemble)
@@ -140,4 +140,54 @@ end
 
 function get_model(e::GMC_NS_Ensemble,no)
     return deserialize(e.path*'/'*string(no))
+end
+
+#recalculate the ensemble's history from the succession of log_Li and log_Xi values
+function rectify_ensemble!(e::GMC_NS_Ensemble, wi_mode="trapezoidal")
+    Ni=round.(collect(-1:-1:-length(e.log_Li)+1)./e.log_Xi[2:end])
+    push!(Ni,Ni[end])
+
+    for i in 1:length(e.log_Li)-1
+        j=i+1
+        if wi_mode=="trapezoidal"
+            e.log_wi[j]= logaddexp(e.log_Xi[i], - ((j+1)/Ni[j])) - log(2) #log width of prior mass spanned by the last step-trapezoidal approx
+        elseif wi_mode=="simple"
+            e.log_wi[j]= logaddexp(e.log_Xi[i], - e.log_Xi[j]/Ni[i]) #log width of prior mass spanned by the last step-simple approx
+        else
+            throw(ArgumentError("Unsupported wi_mode!"))
+        end
+        e.log_Liwi[j]=lps(e.log_Li[j],e.log_wi[j]) #log likelihood + log width = increment of evidence spanned by iterate
+        e.log_Zi[j]=logaddexp(e.log_Zi[i],e.log_Liwi[j])    #log evidence
+        #information- dimensionless quantity
+        Hj=lps( 
+            (exp(lps(e.log_Liwi[j],-e.log_Zi[j])) * e.log_Li[j]), 
+            (exp(lps(e.log_Zi[i],-e.log_Zi[j])) * lps(e.Hi[i],e.log_Zi[i])),
+            -e.log_Zi[j])
+        Hj === -Inf ? (e.Hi[j]=0.) : (e.Hi[j]=Hj)
+    end
+end
+    
+#get a posterior kernel density estimate from the ensemble
+function posterior_kde(e::GMC_NS_Ensemble, scale=400., bw=1.)
+    !e.sample_posterior && throw(ArgumentError("This ensemble is not set to collect posterior samples!"))
+
+    θ_mat=zeros(length(e.models[1].pos),length(e.models)+length(e.posterior_samples))
+    weight_vec=zeros(length(e.models)+length(e.posterior_samples))
+
+    for (n,mrec) in enumerate(e.posterior_samples)
+        m=deserialize(mrec.path)
+        θ_mat[:,n]=m.θ
+        weight_vec[n]=e.log_Liwi[n+1]
+    end
+
+    for (n,mrec) in enumerate(e.models)
+        m=deserialize(mrec.path)
+        p=length(e.posterior_samples)
+        θ_mat[:,n+p]=m.θ
+        weight_vec[n+p]=m.log_Li + lps(e.log_Xi[end], -length(e.models))
+    end
+
+    weight_vec.-=(maximum(weight_vec)-scale)
+
+    return kde!(θ_mat,[bw],exp.(weight_vec))
 end

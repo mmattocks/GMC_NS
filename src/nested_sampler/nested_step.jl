@@ -7,6 +7,7 @@ Step and update ensemble e by sampling the e.contour-bounded prior mass via Gali
 
 function nested_step!(e::GMC_NS_Ensemble, tuners::Dict{Int64,τ_PID})
     N = length(e.models) #number of sample models/particles on the posterior surface
+    Np1=N #decrement this if a model is killed for trapezoidal approx
     i = length(e.log_Li) #iterate number, index for last values
     j = i+1 #index for newly pushed values
 
@@ -26,6 +27,7 @@ function nested_step!(e::GMC_NS_Ensemble, tuners::Dict{Int64,τ_PID})
             model_selected=diffusion_search(e,tuners,least_likely_idx,N,e.GMC_τ_death)
             samples+=1
         else #if not, push to the posterior samples and let it die
+            Np1-=1
             model_selected=true
             e.sample_posterior && push!(e.posterior_samples, e.models[least_likely_idx])#if sampling posterior, push the model record to the ensemble's posterior samples vector
             deleteat!(e.models, least_likely_idx) #remove least likely model record
@@ -37,14 +39,15 @@ function nested_step!(e::GMC_NS_Ensemble, tuners::Dict{Int64,τ_PID})
     #UPDATE ENSEMBLE QUANTITIES   
     push!(e.log_Li, minimum([model.log_Li for model in e.models])) #log likelihood of the least likely model - the current ensemble ll contour at Xi
     push!(e.log_Xi, -i/N) #log Xi - crude estimate of the iterate's enclosed prior mass
-    push!(e.log_wi, lps(e.log_Xi[i], -((j+1)/N)-log(2))) #log width of prior mass spanned by the last step-trapezoidal approx
+    push!(e.log_wi, logaddexp(e.log_Xi[i], - ((j+1)/Np1)) - log(2)) #log width of prior mass spanned by the last step-trapezoidal approx
     push!(e.log_Liwi, lps(e.log_Li[j],e.log_wi[j])) #log likelihood + log width = increment of evidence spanned by iterate
     push!(e.log_Zi, logaddexp(e.log_Zi[i],e.log_Liwi[j]))    #log evidence
     #information- dimensionless quantity
-    push!(e.Hi, lps(
-            (exp(lps(e.log_Liwi[j],-e.log_Zi[j])) * e.log_Li[j]), #term1
-            (exp(lps(e.log_Zi[i],-e.log_Zi[j])) * lps(e.Hi[i],e.log_Zi[i])), #term2
-            -e.log_Zi[j])) #term3
+    Hj=lps( 
+        (exp(lps(e.log_Liwi[j],-e.log_Zi[j])) * e.log_Li[j]), 
+        (exp(lps(e.log_Zi[i],-e.log_Zi[j])) * lps(e.Hi[i],e.log_Zi[i])),
+        -e.log_Zi[j])
+    Hj === -Inf ? push!(e.Hi,0.) : push!(e.Hi, Hj)
 
     return 0
 end

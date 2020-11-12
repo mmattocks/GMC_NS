@@ -403,7 +403,7 @@ uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 
 [[NGRefTools]]
 deps = ["ConjugatePriors", "Distributions"]
-git-tree-sha1 = "36697dcf9a0924f9f91b63c24bfda6b84f0ae253"
+git-tree-sha1 = "4e40ece10b6c426798e85894b51ae8b77b08f998"
 repo-rev = "master"
 repo-url = "https://github.com/mmattocks/NGRefTools.jl"
 uuid = "1b89f441-c1fd-4480-9e82-cf849a5cdb22"

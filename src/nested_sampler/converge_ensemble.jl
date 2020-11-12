@@ -1,4 +1,4 @@
-function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), backup::Tuple{Bool,Integer}=(false,0), clean::Tuple{Bool,Integer,Integer}=(false,0,0), verbose::Bool=false, converge_criterion::String="standard", converge_factor::AbstractFloat=.01, mc_noise::AbstractFloat=0., progargs...)
+function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), backup::Tuple{Bool,Integer}=(false,0), clean::Tuple{Bool,Integer,Integer}=(false,0,0),  converge_criterion::String="standard", converge_factor::AbstractFloat=.01, mc_noise::AbstractFloat=0., progargs...)
     N = length(e.models); curr_it=length(e.log_Li)
 
     if curr_it==1 || !isfile(e.path*"/tuner")
@@ -15,7 +15,7 @@ function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), bac
         warn == 1 && (@error "Failed to find new models, aborting at current iterate."; return e)
         curr_it += 1
 
-        backup[1] && curr_it%backup[2] == 0 && e_backup(e,tuner_dict) #every backup interval, serialise the ensemble and instruction
+        backup[1] && curr_it%backup[2] == 0 && e_backup(e,tuner_dict) #every backup interval, serialise the ensemble and tuner
         clean[1] &&  !e.sample_posterior && curr_it%clean[2] == 0 && clean_ensemble_dir(e,clean[3]) #every clean interval, remove old discarded models
 
         update!(meter, converge_check(e,converge_factor,vals=true)...)
@@ -24,7 +24,7 @@ function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), bac
     if converge_check(e,converge_factor, mc_noise)
         final_logZ = complete_evidence(e)
         ms=measurement(final_logZ,sqrt(abs(e.Hi[end])/length(e.models)))
-        @info "Job done, sampled to convergence. Final logZ $ms"
+        @info "Job done, sampled to convergence. Final logZ $(ms.val) ± $(ms.err)"
 
         e_backup(e,tuner_dict)
         clean[1] && !e.sample_posterior && clean_ensemble_dir(e,0) #final clean
