@@ -221,6 +221,12 @@ git-tree-sha1 = "501c11d708917ca09ce357bed163dbaf0f30229f"
 uuid = "31c24e10-a181-5473-b8eb-7969acd0382f"
 version = "0.23.12"
 
+[[DocStringExtensions]]
+deps = ["LibGit2", "Markdown", "Pkg", "Test"]
+git-tree-sha1 = "50ddf44c53698f5e784bbebb3f4b21c5807401b1"
+uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+version = "0.8.3"
+
 [[EllipsisNotation]]
 git-tree-sha1 = "65dad386e877850e6fce4fc77f60fe75a468ce9d"
 uuid = "da5c29d0-fa7d-589e-88eb-ea29b0a81949"
@@ -331,6 +337,12 @@ deps = ["Dates", "Mmap", "Parsers", "Unicode"]
 git-tree-sha1 = "81690084b6198a2e1da36fcfda16eeca9f9f24e4"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 version = "0.21.1"
+
+[[KernelDensityEstimate]]
+deps = ["DelimitedFiles", "Distributions", "DocStringExtensions", "LinearAlgebra", "Statistics", "Test"]
+git-tree-sha1 = "0509fe381125415b9583d753f56726f5cdf348c8"
+uuid = "2472808a-b354-52ea-a80e-1658a3c6056d"
+version = "0.5.2"
 
 [[LeftChildRightSiblingTrees]]
 deps = ["AbstractTrees"]

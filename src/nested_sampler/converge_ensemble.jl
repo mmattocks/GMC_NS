@@ -54,7 +54,7 @@ end
                     val=findmax([model.log_Li for model in e.models])[1]-e.contour
                     thresh=compression_ratio
 
-                    isinf(val) && return false
+                    val===-Inf && (val=nextfloat(val))
                     vals ? (return val, thresh) : (return val<thresh)
                 end
 
