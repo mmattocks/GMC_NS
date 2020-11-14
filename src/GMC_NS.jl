@@ -1,5 +1,5 @@
 module GMC_NS
-    using Distributed, Distributions, Serialization, UnicodePlots
+    using  Distributions, Serialization, UnicodePlots
     import ProgressMeter: AbstractProgress, Progress, @showprogress, next!, move_cursor_up_while_clearing_lines, printover, durationstring
     import Printf: @sprintf
     import Random: rand
