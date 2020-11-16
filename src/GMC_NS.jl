@@ -10,7 +10,6 @@ module GMC_NS
     import StatsFuns: logaddexp, logsumexp
     import Base: show
     import Measurements: measurement
-    import NGRefTools: marginals
     import ConjugatePriors: NormalGamma
     import KernelDensityEstimate: kde!
 
