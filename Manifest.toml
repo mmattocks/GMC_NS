@@ -815,7 +815,7 @@ version = "0.2.4"
 
 [[NGRefTools]]
 deps = ["ConjugatePriors", "Distributions", "Makie", "Plots"]
-git-tree-sha1 = "a095fcd54ff7003d9f9bda6d926d7e3fe485b8c0"
+git-tree-sha1 = "d774f95be848cc746be3a321367b3fff2722f4b0"
 repo-rev = "master"
 repo-url = "https://github.com/mmattocks/NGRefTools.jl"
 uuid = "1b89f441-c1fd-4480-9e82-cf849a5cdb22"
