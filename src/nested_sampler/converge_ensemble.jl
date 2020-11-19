@@ -22,8 +22,7 @@ function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), bac
     end
 
     if converge_check(e,converge_factor, mc_noise)
-        final_logZ = complete_evidence(e)
-        ms=measurement(final_logZ,sqrt(abs(e.Hi[end])/length(e.models)))
+        ms=measure_evidence(e)
         @info "Job done, sampled to convergence. Final logZ $(ms.val) ± $(ms.err)"
 
         e_backup(e,tuner_dict)

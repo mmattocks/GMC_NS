@@ -20,6 +20,11 @@ function complete_evidence(e::GMC_NS_Ensemble)
     return final_logZ = logaddexp(e.log_Zi[end], (logsumexp([model.log_Li for model in e.models] .+  (e.log_Xi[length(e.log_Li)] - log(length(e.models))))))
 end
 
+function measure_evidence(e::GMC_NS_Ensemble)
+    return ms=measurement(complete_evidence(e),sqrt(abs(e.Hi[end])/length(e.models)))
+end
+
+
 function reset_ensemble!(e::GMC_NS_Ensemble)
     new_e=deepcopy(e)
     for i in 1:length(e.models)

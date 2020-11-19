@@ -32,7 +32,7 @@ module GMC_NS
     include("utilities/coordinate_utils.jl")
     export box_bound!, to_prior, to_unit_ball, box_reflect!
     include("utilities/ensemble_utilities.jl")
-    export ensemble_history, clean_ensemble_dir, complete_evidence, reset_ensemble!, move_ensemble!, copy_ensemble!, rewind_ensemble, show_models, show_models_e, get_model, rectify_ensemble!, posterior_kde
+    export ensemble_history, clean_ensemble_dir, measure_evidence, reset_ensemble!, move_ensemble!, copy_ensemble!, rewind_ensemble, show_models, show_models_e, get_model, rectify_ensemble!, posterior_kde
     include("utilities/ns_progressmeter.jl")
     include("utilities/progress_displays.jl")
     export tuning_display,evidence_display,convergence_display,info_display,lh_display,liwi_display,ensemble_display,model_display,model_obs_display
