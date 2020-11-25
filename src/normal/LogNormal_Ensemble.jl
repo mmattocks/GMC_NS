@@ -57,8 +57,9 @@ LogNormal_Ensemble(
 
 function Base.show(io::IO, m::LogNormal_Model, e::LogNormal_Ensemble; xsteps=100, progress=true)
     μ,λ=m.θ
-    σ=sqrt(1/λ)
-    n=LogNormal(μ,σ)
+    lμ=log(μ^2/sqrt(μ^2 + inv(λ)))
+    lσ=sqrt(log(1+(inv(λ)/μ^2)))
+    n=LogNormal(lμ,lσ)
     X=[quantile(n,.025):(quantile(n,.975)-quantile(n,.025))/xsteps:quantile(n,.975)...]
     y=pdf.(n,X)
 
