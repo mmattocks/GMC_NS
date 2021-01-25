@@ -1,4 +1,6 @@
-mutable struct LogNormal_Model <: GMC_NS_Model
+#NOTE: LogNormal_Models reuse Normal_Records
+
+struct LogNormal_Model <: GMC_NS_Model
     trajectory::Integer #id integer assigned at construction
     i::Integer #id of parent model, if any
 
@@ -7,21 +9,17 @@ mutable struct LogNormal_Model <: GMC_NS_Model
 
     pos::Vector{Float64}
     v::Vector{Float64} #model's velocity in parameter space
-
-    function LogNormal_Model(trajectory::Integer, i::Integer, θ::Vector{Float64}, pos::Vector{Float64}, v::Vector{Float64}, obs::Vector{Float64}; v_init=false)
-        μ,λ=θ
-        lμ=log(μ^2/sqrt(μ^2 + inv(λ)))
-        lσ=sqrt(log(1+(inv(λ)/μ^2)))
-        mod_lnormal=LogNormal(lμ,lσ)
-        log_lh=lps(logpdf(mod_lnormal, obs))
-        v_init && (v=rand(MvNormal(length(θ),1.)))
-
-        new(trajectory, i, θ, log_lh, pos, v)
-    end
 end
 
-function construct_lognormal_model(args...; kwargs...)
-    return LogNormal_Model(args...; kwargs...)
+function construct_lognormal_model(trajectory::Integer, i::Integer, θ::Vector{Float64}, pos::Vector{Float64}, v::Vector{Float64}, obs::Vector{Float64}; v_init=false)
+    μ,λ=θ
+    lμ=log(μ^2/sqrt(μ^2 + inv(λ)))
+    lσ=sqrt(log(1+(inv(λ)/μ^2)))
+    mod_lnormal=LogNormal(lμ,lσ)
+    log_lh=lps(logpdf.(mod_lnormal, obs))
+    v_init && (v=rand(MvNormal(length(θ),1.)))
+
+    LogNormal_Model(trajectory, i, θ, log_lh, pos, v)
 end
 
 function Base.show(io::IO, m::LogNormal_Model; xsteps=100)

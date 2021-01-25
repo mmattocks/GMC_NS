@@ -77,7 +77,7 @@ end
 
 function GMC_NS_Progress(e::GMC_NS_Ensemble, 
     #tuner::GMC_Tuner,
-     interval::Real; dt::Real=0.1, desc::AbstractString="GMC-NS::", color::Symbol=:green, output::IO=stderr, offset::Integer=0, start_it::Integer=1, upper_displays::AbstractVector{<:AbstractVector{Function}}, lower_displays::AbstractVector{<:AbstractVector{Function}}, disp_rot_its::Integer)
+     interval::Real; dt::Real=0.1, desc::AbstractString="GMC-NS::", color::Symbol=:green, output::IO=stderr, offset::Integer=0, start_it::Integer=1, upper_displays::AbstractVector{<:AbstractVector{Function}}=Vector{Vector{Function}}(), lower_displays::AbstractVector{<:AbstractVector{Function}}=Vector{Vector{Function}}(), disp_rot_its::Integer=0)
     top_m = deserialize(e.models[findmax([model.log_Li for model in e.models])[2]].path)
     
     return GMC_NS_Progress{typeof(interval)}(e, top_m,

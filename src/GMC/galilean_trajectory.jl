@@ -20,94 +20,91 @@ Finally, if reflection fails to produce a new particle inside the contour, inver
 ''[θ,v] -> [θ, v′=-v]''
 
 """
-function galilean_trajectory_sample!(m, e, tuner)
-    t=m.trajectory;i=m.i+1
+function galilean_trajectory_sample!(m, e, tuner, cache)
+    t=m.trajectory; next_i=m.i+1; cache_i=m.i+2
 
     e.GMC_timestep_η > 0. ? (τ=max(tuner.τ+rand(Normal(0,tuner.τ*e.GMC_timestep_η)),eps())) : (τ=tuner.τ) #perturb τ if specified
     d=τ*m.v #distance vector for given timestep
-    box_rflct=false
-    fwd_pos,adj_d=box_move(m.pos,d,e.box)
-    isapprox(fwd_pos,m.pos)&&(box_rflct=true)
-
-    # println(e.box)
-    # println(m.pos)
-    # println(d)
-    # println(fwd_pos)
+    fwd_pos,adj_d,box_rflct=box_move(m.pos,d,e.box)
     
-    !box_rflct ? (new_m=e.model_initλ(t, i, to_prior.(fwd_pos,e.priors), fwd_pos, m.v, e.obs, e.constants...)) : (new_m=m) #try to proceed along distance vector
+    if !box_rflct #if we're not stopped by the sampling box
+        fwd_m=e.model_initλ(t, next_i, to_prior.(fwd_pos,e.priors), fwd_pos, m.v, e.obs, e.constants...)  #try to proceed along distance vector
+        if m.θ==fwd_m.θ #if forward motion is no longer making a difference to the parameter vector (ie timestep is too small), kill the trajectory and bail out
+            tuner.τ=e.GMC_τ_death
+            return m, nothing
+        end
+    else
+        fwd_m=m #placeholder, no effect on box reflection
+    end
 
-    # println("fwd: $(new_m.log_Li-m.log_Li) ")
-
-    if box_rflct || (new_m.log_Li < m.log_Li) #if that didnt work
+    if box_rflct || (fwd_m.log_Li < m.log_Li) #if no model is available from the position along the distance vector, search for reflections and store in cache
         process_report!(tuner, false)
 
-        lhδ=lps(m.log_Li,-new_m.log_Li) #get the lhδ between the two points
+        lhδ=lps(m.log_Li,-fwd_m.log_Li) #get the likelihood difference between the two points
         n=boundary_norm(adj_d,lhδ) #get the gradient normal for the distance and lhδ
-        box_rflct ? (v′=box_reflect(m.pos,e.box,m.v)) : v′=reflect(m.v,n,e.GMC_reflect_η) #get the reflected velocity vector off the boundary "east"
+        box_rflct ? (v′=box_reflect(m.pos,e.box,m.v)) : v′=reflect(m.v,n,e.GMC_reflect_η) #get the reflected velocity vector off the boundary "east", or off the sampling box
         rd=τ*v′ #reflected distance given the timestep
-        # println("v': $v′, rd $rd")
         east_pos,_=box_move(m.pos,rd,e.box)
-        new_m=e.model_initλ(t, i, to_prior.(east_pos,e.priors), east_pos, v′, e.obs, e.constants...) #try going east
-        # println("newθ: $(to_prior.(east_pos,e.priors))")
-
-        # println("east: $(new_m.log_Li-m.log_Li) ")
-
-        if new_m.log_Li < m.log_Li && !box_rflct
+        cache=e.model_initλ(t, cache_i, to_prior.(east_pos,e.priors), east_pos, v′, e.obs, e.constants...) #try going east, or reflecting off the box
+        if cache.log_Li < m.log_Li && !box_rflct #no west reflection off the sampling box
             process_report!(tuner, false)
 
             west_pos,_=box_move(m.pos,-rd,e.box)
-            new_m=e.model_initλ(t, i, to_prior.(west_pos,e.priors), west_pos, -v′, e.obs, e.constants...)  #if east reflection fails, try west
-            # println("newθ: $(to_prior.(west_pos,e.priors))")
-
-            # println("west: $(new_m.log_Li-m.log_Li) ")
-
+            cache=e.model_initλ(t, cache_i, to_prior.(west_pos,e.priors), west_pos, -v′, e.obs, e.constants...)  #if east reflection fails, try west
         end
-        if new_m.log_Li < m.log_Li
+        if cache.log_Li < m.log_Li
             process_report!(tuner, false)
             south_pos,_=box_move(m.pos,-d,e.box)
-            new_m=e.model_initλ(t, i, to_prior.(south_pos,e.priors),south_pos,-m.v, e.obs, e.constants...)  #if west reflection fails, try south
-            # println("newθ: $(to_prior.(south_pos,e.priors))")
-
-            # println("south: $(new_m.log_Li-m.log_Li) ")
-
+            cache=e.model_initλ(t, cache_i, to_prior.(south_pos,e.priors),south_pos,-m.v, e.obs, e.constants...)  #if west or box reflection fails, try south (reversed along the particle's vector)
         end
-        new_m.log_Li < m.log_Li && (process_report!(tuner, false); m.v=-m.v) #if that fails reverse the particle velocity and wait for smaller τ
+        cache.log_Li < m.log_Li && (process_report!(tuner, false)) #if that fails wait for smaller τ
     end
-    new_m.log_Li < m.log_Li ? (return m) : (process_report!(tuner, true); return new_m)
+
+    if cache!==nothing && cache.log_Li >= m.log_Li #a reflection that results in a model above contour exists, so return a model in place with the appropriate velocity vector and the cached model down the reflection vector
+        r_m=construct_reflection(m, next_i, cache.v)
+        return (r_m, cache)
+    else #if no reflections occurred or no reflected positions above the contour were found - either forward search succeeded or the whole search failed
+        cache!==nothing && (cache=nothing) #reset cache if it's been set with a model below contour
+        fwd_m.i == next_i && fwd_m.log_Li >= m.log_Li ? (process_report!(tuner, true); return fwd_m, cache) : (return m, cache) #if the forward model is a new iterate and at or above the contour, return that, otherwise return the original model
+    end
 end
 
                 function box_move(pos,d,box)
-                    if !(all(box[:,1].<pos+d.<box[:,2]))
-                        b=isapprox.(pos,box)
-                        pos[b[:,1]].=box[b[:,1],1]
-                        pos[b[:,2]].=box[b[:,2],2]
-                        boundary_d=box.-pos
-                        boundary_t=boundary_d./d
-                        #boundary_t[b].=eps()
-                        first_b_idx=findfirst(isequal(minimum(boundary_t[findall(x->x>=0.,boundary_t)])),boundary_t)
+                    if !(all(box[:,1].<pos+d.<box[:,2])) #if not all coordinates after move would be in the box
+                        boundary_d=box.-pos #get distances to box boundaries
+                        boundary_t=boundary_d./d #get time to hit boundaries, given particle displacment d
+
+                        for idx in findall(x->x>=0.,boundary_t) #for any boundaries the particle is riding (distance 0), give a small positive time if the particle is headed into the boundary to allow that dimension to be selected for bounding
+                            (dim,bound)=(idx[1],idx[2])
+                            boundary_t[idx]==0. && ((bound==1 && d[dim] < 0.) || (bound==2 && d[dim] > 0.)) && (boundary_t[idx]=eps())
+                        end
+
+                        first_b_idx=findfirst(isequal(minimum(boundary_t[findall(x->x>0.,boundary_t)])),boundary_t) #find the index of the first boundary that would be hit
                         first_b_d=boundary_d[first_b_idx]
                         d=d.*(first_b_d/d[first_b_idx[1]])
                     end
 
-                    return pos+d, d
+                    all(d.==0.) ? box_reflect=true : box_reflect=false
+
+                    return pos+d, d, box_reflect
                 end
 
                 function box_reflect(pos,box,v)
-                    if !(all(box[:,1].<pos.<box[:,2]))
-                        b=isapprox.(pos,box)
-                        low_idxs=[v[i]<0&&b[i,1] for i in 1:length(v)]
-                        hi_idxs=[v[i]>0&&b[i,2] for i in 1:length(v)]
-                        v[low_idxs]=-v[low_idxs]
-                        v[hi_idxs]=-v[hi_idxs]
-                    end
-                    return v
+                    b=isapprox.(pos,box)
+                    low_idxs=[v[i]<0&&b[i,1] for i in 1:length(v)]
+                    hi_idxs=[v[i]>0&&b[i,2] for i in 1:length(v)]
+
+                    rv=copy(v)
+                    rv[low_idxs]=-v[low_idxs]
+                    rv[hi_idxs]=-v[hi_idxs]
+                    return rv
                 end
 
                 function boundary_norm(v, lhδ)
-                    b=[lhδ/vi for vi in v]
-                    b[b.==Inf].=prevfloat(Inf) #rectify invalid vals
-                    b[b.==0.].=rand([nextfloat(0.),prevfloat(0.)])
-                    b[b.==-Inf].=nextfloat(-Inf)  
+                    b=lhδ./v
+                    b[b.==Inf].=prevfloat(Inf) #rectify overflow
+                    b[b.==0.].=rand([nextfloat(0.),prevfloat(0.)]) #rectify exact 0.
+                    b[b.==-Inf].=nextfloat(-Inf) #rectify underflow
                     return normalize(b)
                 end
 

@@ -51,11 +51,11 @@ mutable struct τ_PID <: GMC_Tuner
     end
 end
 
-function process_report!(t::τ_PID, report::Bool, update::Bool=true)
+function process_report!(t::τ_PID, report::Bool)
     push!(t.a_history, report)
     length(t.a_history)>t.memory ? (t.a=t.a_history[end-t.memory:end]) : (t.a=t.a_history)
     push!(t.ℵ,mean(t.a))
-    update && τ_update!(t)
+    τ_update!(t)
 end
 
 function τ_update!(t::τ_PID)

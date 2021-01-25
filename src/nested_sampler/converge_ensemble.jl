@@ -10,13 +10,18 @@ function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), bac
     meter = GMC_NS_Progress(e, 0.; start_it=curr_it, progargs...)
 
     converge_check = get_convfunc(converge_criterion)
+
+    reflect_cache = nothing #init cache for models precalculated in galilean reflection
+
+    cln_switch = clean[1] && !e.sample_posterior #ignore clean arguments if posterior samples are to be collected
+
     while !converge_check(e, converge_factor, mc_noise) && (curr_it <= max_iterates)
-        warn = nested_step!(e, tuner_dict)
+        warn = nested_step!(e, tuner_dict, reflect_cache)
         warn == 1 && (@error "Failed to find new models, aborting at current iterate."; return e)
         curr_it += 1
 
         backup[1] && curr_it%backup[2] == 0 && e_backup(e,tuner_dict) #every backup interval, serialise the ensemble and tuner
-        clean[1] &&  !e.sample_posterior && curr_it%clean[2] == 0 && clean_ensemble_dir(e,clean[3]) #every clean interval, remove old discarded models
+        cln_switch && curr_it%clean[2] == 0 && clean_ensemble_dir(e,clean[3]) #every clean interval, remove old discarded models
 
         update!(meter, converge_check(e,converge_factor,vals=true)...)
     end
@@ -25,14 +30,14 @@ function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), bac
         ms=measure_evidence(e)
         @info "Job done, sampled to convergence. Final logZ $(ms.val) ± $(ms.err)"
 
-        e_backup(e,tuner_dict)
-        clean[1] && !e.sample_posterior && clean_ensemble_dir(e,0) #final clean
+        e_backup(e,tuner_dict) #final backup
+        cln_switch && clean_ensemble_dir(e,0) #final clean
         return ms
     elseif curr_it==max_iterates
         @info "Job done, sampled to maximum iterate $max_iterates. Convergence criterion not obtained."
 
-        e_backup(e,tuner_dict)
-        clean[1] && !e.sample_posterior && clean_ensemble_dir(e,0) #final clean
+        e_backup(e,tuner_dict) #final backup
+        cln_switch && clean_ensemble_dir(e,0) #final clean
         return e.log_Zi[end]
     end
 end

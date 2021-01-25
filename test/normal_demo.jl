@@ -10,7 +10,7 @@ box=[0. 1000.
 
 gmc=GMC_DEFAULTS
 gmc[1]=5
-gmc[2]=1.e-15
+gmc[2]=eps()
 
 e=Normal_Ensemble("NE_test", 10, samples, prior, box, gmc...)
 

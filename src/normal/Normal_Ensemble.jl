@@ -31,6 +31,7 @@ mutable struct Normal_Ensemble <: GMC_NS_Ensemble
     GMC_timestep_η::Float64
     GMC_reflect_η::Float64
     GMC_exhaust_σ::Float64
+    GMC_chain_κ::Int64
 
     t_counter::Int64
 end
@@ -94,7 +95,7 @@ function assemble_NMs(path::String, no_trajectories::Integer, obs, prior, box, c
             box_bound!(pos,box)
             θvec=to_prior.(pos,marginals)
 
-            model = Normal_Model(trajectory_no, 1, θvec, pos, [0.], obs, constants...; v_init=true)
+            model = construct_normal_model(trajectory_no, 1, θvec, pos, [0.], obs, constants...; v_init=true)
             
 			serialize(model_path, model) #save the model to the ensemble directory
 			push!(ensemble_records, Normal_Record(trajectory_no,1,pos,model_path,model.log_Li))

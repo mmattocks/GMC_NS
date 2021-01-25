@@ -1,4 +1,4 @@
-struct Normal_Record <: GMC_NS_Model_Record
+mutable struct Normal_Record <: GMC_NS_Model_Record
     trajectory::Int64
     i::Int64
     pos::Vector{Float64}
@@ -6,7 +6,7 @@ struct Normal_Record <: GMC_NS_Model_Record
     log_Li::Float64
 end
 
-mutable struct Normal_Model <: GMC_NS_Model
+struct Normal_Model <: GMC_NS_Model
     trajectory::Integer #id integer assigned at construction
     i::Integer #id of parent model, if any
 
@@ -15,19 +15,15 @@ mutable struct Normal_Model <: GMC_NS_Model
 
     pos::Vector{Float64}
     v::Vector{Float64} #model's velocity in parameter space
-
-    function Normal_Model(trajectory::Integer, i::Integer, θ::Vector{Float64}, pos::Vector{Float64}, v::Vector{Float64}, obs::Vector{Float64}; v_init=false)
-        μ,λ=θ
-        mod_normal=Normal(μ,sqrt(1/λ))
-        log_lh=lps(logpdf(mod_normal, obs))
-        v_init && (v=rand(MvNormal(length(θ),1.)))
-
-        new(trajectory, i, θ, log_lh, pos, v)
-    end
 end
 
-function construct_normal_model(args...; kwargs...)
-    return Normal_Model(args...; kwargs...)
+function construct_normal_model(trajectory::Integer, i::Integer, θ::Vector{Float64}, pos::Vector{Float64}, v::Vector{Float64}, obs::Vector{Float64}; v_init=false)
+    μ,λ=θ
+    mod_normal=Normal(μ,sqrt(1/λ))
+    log_lh=lps(logpdf.(mod_normal, obs))
+    v_init && (v=rand(MvNormal(length(θ),1.)))
+
+    Normal_Model(trajectory, i, θ, log_lh, pos, v)
 end
 
 function Base.show(io::IO, m::Normal_Model; xsteps=100)

@@ -35,6 +35,7 @@ Abstract supertype for model ensembles intended to be subjected to Galilean Mont
         GMC_timestep_η<:AbstractFloat #>0. to apply an perturbation term randomly drawn from Normal(0, η*τ) to τ at each step (can assist equilibration)
         GMC_reflect_η<:AbstractFloat #>0. to apply perturbation to reflection vectors, keep value small (can assist equilibration)
         GMC_exhaust_σ<:AbstractFloat #apply this scale parameter to the ensemble size to obtain the maximum number of GMC iterates to perform before terminating nested sampling
+        GMC_chain_κ<:Integer #maximum chain length
 
         model_counter<:Integer
     end 
