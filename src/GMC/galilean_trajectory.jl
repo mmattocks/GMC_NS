@@ -72,6 +72,8 @@ end
                 function box_move(pos,d,box)
                     if !(all(box[:,1].<pos+d.<box[:,2])) #if not all coordinates after move would be in the box
                         boundary_d=box.-pos #get distances to box boundaries
+                        b=isapprox.(pos,box) #find any boundaries that have been exceeded due to numerical creep
+                        boundary_d[b].=0 #correct these distances
                         boundary_t=boundary_d./d #get time to hit boundaries, given particle displacment d
 
                         for idx in findall(x->x>=0.,boundary_t) #for any boundaries the particle is riding (distance 0), give a small positive time if the particle is headed into the boundary to allow that dimension to be selected for bounding
