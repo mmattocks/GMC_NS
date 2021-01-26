@@ -9,10 +9,22 @@ function e_backup(e::GMC_NS_Ensemble, tuner::Dict{Int64,<:GMC_Tuner})
     serialize(string(e.path,'/',"tuner"), tuner)
 end
 
-function clean_ensemble_dir(e::GMC_NS_Ensemble, model_pad::Integer; ignore_warn=false)
-    !ignore_warn && e.sample_posterior && throw(ArgumentError("Ensemble is set to retain posterior samples and its directory should not be cleaned!"))
+function clean_ensemble_dir!(e::GMC_NS_Ensemble)
+    if e.sample_posterior
+        ens_paths=vcat(
+            [basename(m.path) for m in e.models],
+            [basename(m.path) for m in e.posterior_samples],
+            "ens", "tuner"
+        )
+    else
+        ens_paths=vcat(
+            [basename(m.path) for m in e.models],
+            "ens", "tuner"
+        )
+    end
+
     for file in readdir(e.path)
-        !(file in vcat([basename(model.path) for model in e.models],"ens",[string(number) for number in e.model_counter-length(e.models)-model_pad:e.model_counter-1])) && rm(e.path*'/'*file)
+        !(file in ens_paths) && rm(e.path*'/'*file)
     end
 end
 
@@ -26,33 +38,38 @@ end
 
 
 function reset_ensemble!(e::GMC_NS_Ensemble)
-    new_e=deepcopy(e)
-    for i in 1:length(e.models)
-        if string(i) in [basename(record.path) for record in e.models]
-            new_e.models[i]=e.models[findfirst(isequal(string(i)), [basename(record.path) for record in e.models])]
+    Ni=Int64.(round.(collect(-1:-1:-length(e.log_Li)+1)./e.log_Xi[2:end]))
+    N=Ni[1]
+
+    new_models=Vector{typeof(e.models[1])}()
+
+    for traj in 1:N
+        if string(traj)*".1" in [basename(record.path) for record in e.models]
+            push!(new_models,e.models[findfirst(isequal(string(traj)*".1"), [basename(record.path) for record in e.models])]
         else
-            new_e.models[i]=e.posterior_samples[findfirst(isequal(string(i)), [basename(record.path) for record in e.posterior_samples])]
+            push!(new_models,e.posterior_samples[findfirst(isequal(string(traj)*".1"), [basename(record.path) for record in e.posterior_samples])]
         end
     end
 
-    new_e.contour=minimum([record.log_Li for record in new_e.models])
+    e.models=new_models
+    e.posterior_samples=Vector{typeof(e.models[1])}()
 
-    new_e.log_Li=[new_e.log_Li[1]]
-    new_e.log_Xi=[new_e.log_Xi[1]]
-    new_e.log_wi=[new_e.log_wi[1]]
-    new_e.log_Liwi=[new_e.log_Liwi[1]]
-    new_e.log_Zi=[new_e.log_Zi[1]]
-    new_e.Hi=[new_e.Hi[1]]
+    e.contour=minimum([record.log_Li for record in e.models])
 
-    new_e.posterior_samples=Vector{typeof(e.models[1])}()
+    e.log_Li=[e.log_Li[1]]
+    e.log_Xi=[e.log_Xi[1]]
+    e.log_wi=[e.log_wi[1]]
+    e.log_Liwi=[e.log_Liwi[1]]
+    e.log_Zi=[e.log_Zi[1]]
+    e.Hi=[e.Hi[1]]
 
-    new_e.model_counter=length(new_e.models)+1
+    e.t_counter=length(e.models)+1
 
-    clean_ensemble_dir(new_e, 0; ignore_warn=true)
+    clean_ensemble_dir(e, 0; ignore_warn=true)
     isfile(e.path*"/tuner") && rm(e.path*"/tuner")
-    serialize(e.path*"/ens", new_e)
+    serialize(e.path*"/ens", e)
 
-    return new_e
+    return e
 end
 
 function move_ensemble!(e::GMC_NS_Ensemble,path::String)
@@ -100,34 +117,40 @@ function copy_ensemble(e::GMC_NS_Ensemble,path::String)
     return new_e
 end
 
-function rewind_ensemble(e::GMC_NS_Ensemble,rewind_idx)
+function rewind_ensemble!(e::GMC_NS_Ensemble,rewind_idx)
     !e.sample_posterior && throw(ArgumentError("An ensemble not retaining posterior samples cannot be rewound!"))
     rewind_idx >= length(e.log_Li) && throw(ArgumentError("rewind_idx must be less than the current iterate!"))
 
-    n=length(e.models)
-    max_model_no=length(e.log_Li)+length(e.models)-1
-    rewind_model_no=rewind_idx+length(e.models)-1
-    new_e = deepcopy(e)
+    Ni=Int64.(round.(collect(-1:-1:-length(e.log_Li)+1)./e.log_Xi[2:end]))
+    insert!(Ni,1,Ni[1])
 
-    rm_models=[string(name) for name in rewind_model_no+1:max_model_no]
+    for it in length(e.log_Li)-1:-1:rewind_idx
+        last_post=pop!(e.posterior_samples)
 
-    filter!(model->!(basename(model.path) in rm_models),new_e.models)
-    filter!(model->!(basename(model.path) in rm_models),new_e.posterior_samples)
+        if Ni[it]==Ni[it-1]
+            models_idx=findfirst(isequal(last_post.trajectory), [rec.trajectory for rec in e.models])
+            insert!(e.models, models_idx, last_post)
+            deleteat!(e.models, models_idx+1)
+        else
+            push!(e.models, last_post)
+        end
 
-    while length(new_e.models) < n
-        push!(new_e.models,pop!(new_e.posterior_samples))
+        !(length(e.models)==Ni[it-1]) && throw(DomainError("it: $it Ni[it]:$(Ni[it]) Ni[it-1]:$(Ni[it-1])"))
     end
-    new_e.contour=new_e.log_Li[rewind_idx]
-    new_e.log_Li=new_e.log_Li[1:rewind_idx]
-    new_e.log_Xi=new_e.log_Xi[1:rewind_idx]
-    new_e.log_wi=new_e.log_wi[1:rewind_idx]
-    new_e.log_Liwi=new_e.log_Liwi[1:rewind_idx]
-    new_e.log_Zi=new_e.log_Zi[1:rewind_idx]
-    new_e.Hi=new_e.Hi[1:rewind_idx]
 
-    new_e.model_counter=length(new_e.models)+rewind_idx
+    e.contour=e.log_Li[rewind_idx]
+    e.log_Li=e.log_Li[1:rewind_idx]
+    e.log_Xi=e.log_Xi[1:rewind_idx]
+    e.log_wi=e.log_wi[1:rewind_idx]
+    e.log_Liwi=e.log_Liwi[1:rewind_idx]
+    e.log_Zi=e.log_Zi[1:rewind_idx]
+    e.Hi=e.Hi[1:rewind_idx]
 
-    return new_e
+    traj_nos=vcat([rec.trajectory for rec in e.models],[rec.trajectory for rec in e.posterior_samples])
+
+    e.t_counter=maximum(traj_nos)
+
+    return e
 end
 
 function show_models(e::GMC_NS_Ensemble,idxs)
@@ -151,9 +174,9 @@ function get_model(e::GMC_NS_Ensemble,no)
 end
 
 #recalculate the ensemble's history from the succession of log_Li and log_Xi values
-function rectify_ensemble!(e::GMC_NS_Ensemble, wi_mode="trapezoidal")
-    Ni=round.(collect(-1:-1:-length(e.log_Li)+1)./e.log_Xi[2:end])
-    push!(Ni,Ni[end])
+function recalculate_ensemble!(e::GMC_NS_Ensemble, wi_mode="trapezoidal")
+    Ni=Int64.(round.(collect(-1:-1:-length(e.log_Li)+1)./e.log_Xi[2:end]))
+    insert!(Ni,1,Ni[1])
 
     for i in 1:length(e.log_Li)-1
         j=i+1
@@ -173,114 +196,6 @@ function rectify_ensemble!(e::GMC_NS_Ensemble, wi_mode="trapezoidal")
             -e.log_Zi[j])
         Hj === -Inf ? (e.Hi[j]=0.) : (e.Hi[j]=Hj)
     end
-end
-
-function rectify_balance!(o_ens::GMC_NS_Ensemble)
-    ens=deepcopy(o_ens)
-    println("Rectifying balance for ensemble at $(ens.path)")
-
-    Nvec=Vector{Int64}()
-    for i in 2:length(ens.log_Li)
-        Xi=ens.log_Xi[i]
-        N=round(-(i-1)/Xi)
-        push!(Nvec, N)
-    end
-    insert!(Nvec,1,Nvec[1])
-
-    for chain in 1:ens.t_counter-1
-        println("Rectifying $chain ...")
-        ch_pfx=ens.path*'/'*string(chain)*'.'
-        total_spls=0
-        while isfile(ch_pfx*string(total_spls+1))
-            total_spls+=1
-        end
-
-        lastm=deserialize(ch_pfx*string(1))
-        insert_idxs=Vector{Int64}()
-        insert_ms=Vector{GMC_NS_Model}()
-
-        for spl in 2:total_spls
-            splm=deserialize(ch_pfx*string(spl))
-
-            if splm.θ!=lastm.θ && splm.v!=lastm.v
-                push!(insert_idxs,spl)
-
-                m_name=string(chain)*string(spl)
-
-                new_mod=deepcopy(lastm)
-                new_mod.v=splm.v
-                new_mod.i=spl
-                push!(insert_ms, new_mod)
-
-                insert_record=typeof(ens.models[1])(chain, spl, new_mod.pos, ch_pfx*string(new_mod.i),new_mod.log_Li)
-
-                insert_idx=findfirst(i-> >(i,new_mod.log_Li),ens.log_Li)
-
-                insert!(ens.log_Li, insert_idx, ens.log_Li[insert_idx-1])
-                insert!(ens.posterior_samples, insert_idx, insert_record)
-                insert!(Nvec, insert_idx, Nvec[insert_idx-1])
-            end
-
-            lastm=splm
-        end
-
-        save_idxs=zeros(Int64, total_spls)
-
-        spl_diff=0
-        for idx in 1:total_spls
-            idx in insert_idxs && (spl_diff+=1)
-            save_idxs[idx]=idx+spl_diff
-        end
-
-        post_paths=[rec.path for rec in ens.posterior_samples]
-        mod_paths=[rec.path for rec in ens.models]
-        modswitch=false
-
-        for idx in total_spls:-1:1
-            old_i=ch_pfx*string(idx)
-
-            recidx=findfirst(pth->occursin(old_i,pth), post_paths)
-            recidx===nothing && (recidx=findfirst(pth->occursin(old_i,pth), mod_paths); modswitch=true)
-
-            modswitch ? (rec=ens.models[recidx]) : (rec=ens.posterior_samples[recidx])
-            rec.i=save_idxs[idx]
-            rec.path=ch_pfx*string(idx)
-
-            model=deserialize(old_i)
-            model.i=save_idxs[idx]
-            serialize(ch_pfx*string(save_idxs[idx]), model)
-        end
-         
-        for (idx,m) in zip(insert_idxs,insert_ms)
-            serialize(ch_pfx*string(idx), m)
-        end
-
-    end
-
-    ens.log_Xi=	[0] #ie exp(0) = all of the prior is covered
-    ens.log_wi=[-Inf] #w0 = 0
-    ens.log_Liwi=[-Inf] #Liwi0 = 0
-    ens.log_Zi=[-1e300] #Z0 = 0
-    ens.Hi=[0] #H0 = 0,
-    
-    for i in 1:length(ens.log_Li)-1
-        j=i+1
-        N=Nvec[i]
-        push!(ens.log_Xi, -i/N) #log Xi - crude estimate of the iterate's enclosed prior mass
-        push!(ens.log_wi, logaddexp(ens.log_Xi[i], - ((j+1)/N)) - log(2)) #log width of prior mass spanned by the last step-trapezoidal approx
-        push!(ens.log_Liwi, lps(ens.log_Li[j],ens.log_wi[j])) #log likelihood + log width = increment of evidence spanned by iterate
-        push!(ens.log_Zi, logaddexp(ens.log_Zi[i],ens.log_Liwi[j]))    #log evidence
-        #information- dimensionless quantity
-        Hj=lps( 
-            (exp(lps(ens.log_Liwi[j],-ens.log_Zi[j])) * ens.log_Li[j]), 
-            (exp(lps(ens.log_Zi[i],-ens.log_Zi[j])) * lps(ens.Hi[i],ens.log_Zi[i])),
-            -ens.log_Zi[j])
-        Hj === -Inf ? push!(ens.Hi,0.) : push!(ens.Hi, Hj)
-    end
-
-    serialize(ens.path*"/ens", ens)
-
-    return ens
 end
     
 #get a posterior kernel density estimate from the ensemble
@@ -306,29 +221,4 @@ function posterior_kde(e::GMC_NS_Ensemble, scale=400., bw=1.)
     weight_vec.-=(maximum(weight_vec)-scale)
 
     return kde!(θ_mat,[bw],exp.(weight_vec))
-end
-
-function ensemble_filter(ens)
-    println("Filtering ensemble at $(ens.path)")
-
-    ens_paths=vcat(
-        [m.path for m in ens.models],
-        [m.path for m in ens.posterior_samples]
-    )
-
-    for chain in 1:ens.t_counter-1
-        println("Filtering chain $chain...")
-        ch_pfx=ens.path*'/'*string(chain)*'.'
-        total_spls=0
-        while isfile(ch_pfx*string(total_spls+1))
-            total_spls+=1
-        end
-
-        for spl in 2:total_spls
-            splpath=ch_pfx*string(spl)
-            if !(splpath in ens_paths)
-                rm(splpath)
-            end
-        end
-    end
 end

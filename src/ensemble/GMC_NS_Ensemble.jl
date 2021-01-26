@@ -37,7 +37,7 @@ Abstract supertype for model ensembles intended to be subjected to Galilean Mont
         GMC_exhaust_σ<:AbstractFloat #apply this scale parameter to the ensemble size to obtain the maximum number of GMC iterates to perform before terminating nested sampling
         GMC_chain_κ<:Integer #maximum chain length
 
-        model_counter<:Integer
+        t_counter<:Integer #counter for next instantiated trajectory number
     end 
 
 """
