@@ -45,9 +45,9 @@ function reset_ensemble!(e::GMC_NS_Ensemble)
 
     for traj in 1:N
         if string(traj)*".1" in [basename(record.path) for record in e.models]
-            push!(new_models,e.models[findfirst(isequal(string(traj)*".1"), [basename(record.path) for record in e.models])]
+            push!(new_models,e.models[findfirst(isequal(string(traj)*".1"), [basename(record.path) for record in e.models])])
         else
-            push!(new_models,e.posterior_samples[findfirst(isequal(string(traj)*".1"), [basename(record.path) for record in e.posterior_samples])]
+            push!(new_models,e.posterior_samples[findfirst(isequal(string(traj)*".1"), [basename(record.path) for record in e.posterior_samples])])
         end
     end
 
