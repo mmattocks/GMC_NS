@@ -1,24 +1,11 @@
 """
-    galilean_trajectory_sample(e, m, τ)
+    galilean_trajectory_sample!(m, e, tuner, cache)
 
-Given 'm <: GMC_NS_Model', 'e <: GMC_NS_Ensemble', and time step τ, attempt to find new model obeying 'new_m.log_Li > e.contour', first by permuting 'm.θ' by the distance given by velocity 'm.v' and time step 'τ', with 'm' retaining particle velocity v:
+Given 'm <: GMC_NS_Model', 'e <: GMC_NS_Ensemble', 'tuner <: GMC_Tuner', and 'cache <: Union{Nothing,GMC_NS_Model}', return the next model-sample from a Gailean trajectory through parameter space, as well as any cached reflection model, obeying 'new_m.log_Li >= e.contour'.
 
-''[θ,v] -> [θ′=θ+τv, v]''
+Implements Skilling's 2019 update to the GMC algorithm. Briefly: proceed "forward" along the trajectory's velocity vector unless the likelihood contour is hit; in this case, attempt to reflect "east", then "west", then "south". If a reflection is found, return the model in the original position with the appropriate new velocity vector, as well as the cached reflection model "forward" along this new vector. If no model with likelihood greater than contour can be found, return the original model (as long as the trajectory is alive it will be retried at lower timestep τ).
 
-If 'e.GMC_timestep_η' is a positive value, τ has a random error term of Normal(0,τ*η) applied.
-
- If this fails, the rejected particle "reflects" off the contour boundary as represented by the gradient normal 'n':
-
- ''[θ,v] -> [θ′′=θ+τv+τv′, v′=v-2n(n∘v)]''
-
-If 'e.GMC_reflect_η' is a positive value, this value (η below) is used with a newly sampled isotropic vector to calculate a perturbed reflection vector 'v′′':
-
-''v′′=v′cosη+rsinη, r=Normal(0,I)''
- 
-Finally, if reflection fails to produce a new particle inside the contour, invert the particle's velocity and return it to the ensemble, preserving detailed balance:
-
-''[θ,v] -> [θ, v′=-v]''
-
+Skilling, John. “Galilean and Hamiltonian Monte Carlo.” In Proceedings, 33:8. Garching, Germany: MDPI, 2019.
 """
 function galilean_trajectory_sample!(m, e, tuner, cache)
     t=m.trajectory; next_i=m.i+1; cache_i=m.i+2
@@ -26,7 +13,7 @@ function galilean_trajectory_sample!(m, e, tuner, cache)
     e.GMC_timestep_η > 0. ? (τ=max(tuner.τ+rand(Normal(0,tuner.τ*e.GMC_timestep_η)),eps())) : (τ=tuner.τ) #perturb τ if specified
     d=τ*m.v #distance vector for given timestep
     fwd_pos,adj_d,box_rflct=box_move(m.pos,d,e.box)
-    
+  
     if !box_rflct #if we're not stopped by the sampling box
         fwd_m=e.model_initλ(t, next_i, to_prior.(fwd_pos,e.priors), fwd_pos, m.v, e.obs, e.constants...)  #try to proceed along distance vector
         if m.θ==fwd_m.θ #if forward motion is no longer making a difference to the parameter vector (ie timestep is too small), kill the trajectory and bail out
@@ -46,15 +33,18 @@ function galilean_trajectory_sample!(m, e, tuner, cache)
         rd=τ*v′ #reflected distance given the timestep
         east_pos,_=box_move(m.pos,rd,e.box)
         cache=e.model_initλ(t, cache_i, to_prior.(east_pos,e.priors), east_pos, v′, e.obs, e.constants...) #try going east, or reflecting off the box
+
         if cache.log_Li < m.log_Li && !box_rflct #no west reflection off the sampling box
             process_report!(tuner, false)
 
             west_pos,_=box_move(m.pos,-rd,e.box)
+
             cache=e.model_initλ(t, cache_i, to_prior.(west_pos,e.priors), west_pos, -v′, e.obs, e.constants...)  #if east reflection fails, try west
         end
         if cache.log_Li < m.log_Li
             process_report!(tuner, false)
             south_pos,_=box_move(m.pos,-d,e.box)
+
             cache=e.model_initλ(t, cache_i, to_prior.(south_pos,e.priors),south_pos,-m.v, e.obs, e.constants...)  #if west or box reflection fails, try south (reversed along the particle's vector)
         end
         cache.log_Li < m.log_Li && (process_report!(tuner, false)) #if that fails wait for smaller τ

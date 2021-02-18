@@ -75,6 +75,16 @@ mutable struct GMC_NS_Progress{T<:Real} <: AbstractProgress
     end
 end
 
+"""
+    GMC_NS_Progress(e, interval; kwargs...)
+
+Return a GMC_NS.jl ProgressMeter for the given ensemble, to be updated at 'interval'. Important keyword arguments:
+
+'upper_displays <: AbstractVector{<:AbstractVector{Function}}': define a vector of above-status-line display functions to rotate through
+'lower_displays <: AbstractVector{<:AbstractVector{Function}}': define a vector of below-status-line display functions to rotate through
+'disp_rot_its <: Integer': define the number of iterates to rotate to the next upper and lower display function vectors
+
+"""
 function GMC_NS_Progress(e::GMC_NS_Ensemble, 
     #tuner::GMC_Tuner,
      interval::Real; dt::Real=0.1, desc::AbstractString="GMC-NS::", color::Symbol=:green, output::IO=stderr, offset::Integer=0, start_it::Integer=1, upper_displays::AbstractVector{<:AbstractVector{Function}}=Vector{Vector{Function}}(), lower_displays::AbstractVector{<:AbstractVector{Function}}=Vector{Vector{Function}}(), disp_rot_its::Integer=0)
