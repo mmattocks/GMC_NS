@@ -3,7 +3,7 @@
 
 Given 'm <: GMC_NS_Model', 'e <: GMC_NS_Ensemble', 'tuner <: GMC_Tuner', and 'cache <: Union{Nothing,GMC_NS_Model}', return the next model-sample from a Gailean trajectory through parameter space, as well as any cached reflection model, obeying 'new_m.log_Li >= e.contour'.
 
-Implements Skilling's 2019 update to the GMC algorithm. Briefly: proceed "forward" along the trajectory's velocity vector unless the likelihood contour is hit; in this case, attempt to reflect "east", then "west", then "south". If a reflection is found, return the model in the original position with the appropriate new velocity vector, as well as the cached reflection model "forward" along this new vector. If no model with likelihood greater than contour can be found, return the original model (as long as the trajectory is alive it will be retried at lower timestep τ).
+Implements Skilling's 2019 update to the GMC algorithm. Briefly: proceed "forward" along the trajectory's velocity vector unless the likelihood contour is hit; in this case, attempt to reflect "east", then "west", then "south". If a reflection is found, return the model in the original position with the new velocity vector (maintaining detailed balance), as well as the cached reflection model "forward" along this new vector. If no model with likelihood greater than contour can be found, return the original model (as long as the trajectory is alive it will be retried at lower timestep τ).
 
 Skilling, John. “Galilean and Hamiltonian Monte Carlo.” In Proceedings, 33:8. Garching, Germany: MDPI, 2019.
 """
