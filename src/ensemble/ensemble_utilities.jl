@@ -173,8 +173,7 @@ function get_model(e::GMC_NS_Ensemble,no)
     return deserialize(e.path*'/'*string(no))
 end
 
-#recalculate the ensemble's history from the succession of log_Li and log_Xi values
-function recalculate_ensemble!(e::GMC_NS_Ensemble, wi_mode="trapezoidal")
+function reestimate_ensemble!(e::GMC_NS_Ensemble, wi_mode="trapezoidal")
     Ni=Int64.(round.(collect(-1:-1:-length(e.log_Li)+1)./e.log_Xi[2:end]))
     insert!(Ni,1,Ni[1])
 
@@ -197,28 +196,37 @@ function recalculate_ensemble!(e::GMC_NS_Ensemble, wi_mode="trapezoidal")
         Hj === -Inf ? (e.Hi[j]=0.) : (e.Hi[j]=Hj)
     end
 end
-    
+
 #get a posterior kernel density estimate from the ensemble
-function posterior_kde(e::GMC_NS_Ensemble, scale=400., bw=1.)
+function posterior_kde(e::GMC_NS_Ensemble; bivar=Vector{Pair{<:Integer}}())
     !e.sample_posterior && throw(ArgumentError("This ensemble is not set to collect posterior samples!"))
 
     θ_mat=zeros(length(e.models[1].pos),length(e.models)+length(e.posterior_samples))
     weight_vec=zeros(length(e.models)+length(e.posterior_samples))
 
+    logz=complete_evidence(e)
+
     for (n,mrec) in enumerate(e.posterior_samples)
         m=deserialize(mrec.path)
         θ_mat[:,n]=m.θ
-        weight_vec[n]=e.log_Liwi[n+1]
+        weight_vec[n]=lps([m.log_Li,e.log_Xi[n+1],-logz])
     end
 
     for (n,mrec) in enumerate(e.models)
         m=deserialize(mrec.path)
         p=length(e.posterior_samples)
         θ_mat[:,n+p]=m.θ
-        weight_vec[n+p]=m.log_Li + lps(e.log_Xi[end], -length(e.models))
+        weight_vec[n+p]=lps([m.log_Li, e.log_Xi[end], -log(length(e.models)),-logz])
     end
 
-    weight_vec.-=(maximum(weight_vec)-scale)
+    kdes=Vector{AbstractKDE}()
+    for t in 1:size(θ_mat,1)
+        push!(kdes,kde(θ_mat[t,:],weights=exp.(weight_vec)))
+    end
 
-    return kde!(θ_mat,[bw],exp.(weight_vec))
+    for bv in bivar
+        push!(kdes,kde((θ_mat[bv[1],:],θ_mat[bv[2],:]),weights=exp.(weight_vec)))
+    end
+
+    return kdes
 end

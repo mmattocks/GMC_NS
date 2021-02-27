@@ -12,7 +12,7 @@ module GMC_NS
     import Measurements: measurement
     import ConjugatePriors: NormalGamma, NormalInverseGamma
     import NGRefTools: MarginalTDist
-    import KernelDensityEstimate: kde!
+    import KernelDensity: kde, AbstractKDE
 
     #GMC settings vector fields: [GMC_Nmin::Int64, GMC_τ_death::Float64, GMC_init_τ::Float64, GMC_tune_μ::Int64, GMC_tune_α::Float64, GMC_tune_PID::NTuple{3,Float64}, GMC_timestep_η::Float64, GMC_reflect_η::Float64, GMC_exhaust_σ::Float64, GMC_chain_κ::Int64]
 
@@ -39,10 +39,13 @@ module GMC_NS
     include("utilities/progress_displays.jl")
     export tuning_display,evidence_display,convergence_display,info_display,lh_display,liwi_display,ensemble_display,model_display,model_obs_display
     include("utilities/stats.jl")
-    include("normal/Normal_Model.jl")
-    include("normal/Normal_Ensemble.jl")
+    include("model/normal/Normal_Model.jl")
+    include("model/normal/Normal_Ensemble.jl")
     export Normal_Ensemble
-    include("normal/LogNormal_Model.jl")
-    include("normal/LogNormal_Ensemble.jl")
+    include("model/normal/LogNormal_Model.jl")
+    include("model/normal/LogNormal_Ensemble.jl")
     export LogNormal_Ensemble
+    include("model/eggbox/Eggbox_Model.jl")
+    include("model/eggbox/Eggbox_Ensemble.jl")
+    export Eggbox_Ensemble
 end # module
