@@ -15,7 +15,7 @@ julia> ]add https://github.com/mmattocks
 
 ## Example: Solving the Eggbox Problem
 
-The eggbox problem uses the likelihood function `log_lh=(2 + cos(5π * x1) * cos(5π * x2))^5`, where x1 and x2 are the two parameters of the model, in the range 0:1. This gives a surface with 16 evenly spaced minima, the "eggbox". To solve it with GMC_NS.jl:
+The eggbox problem uses the likelihood function `log_lh=(2 + cos(5π * x1) * cos(5π * x2))^5`, where x1 and x2 are the two parameters of the model, in the range 0:1. This gives a surface with 18 evenly spaced minima, the "eggbox". To solve it with GMC_NS.jl:
 
 ```
 using GMC_NS, Distributions
@@ -30,7 +30,7 @@ box=[0. 1.
 
 #use the package's default settings
 gmc=GMC_DEFAULTS
-gmc[1]=160 #change the minimum number of live particles to 160
+gmc[1]=180 #change the minimum number of live particles to 160
 gmc[2]=eps() #change the timestep at which particles are killed to be very small
 
 #instantiate an ensemble with 1000 model-particles, given the priors, box, and GMC settings
@@ -47,3 +47,9 @@ converge_ensemble!(e,backup=(true,100),upper_displays=uds,lower_displays=lds, di
 Output:
 
 ![](gmcns.gif)
+
+## Model libraries
+[CMZNicheSims.jl](https://www.github.com/mmattocks/CMZNicheSims.jl): Small library of population- and cell-based simulators of _D. rerio_ circumferential marginal zone retinal progenitor cells.
+
+## Documentation
+More extensive documentation is available [here](https://github.com/mmattocks/Thesis/blob/master/chapters/PTII/CNS.tex).

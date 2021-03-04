@@ -7,7 +7,7 @@ box=[0. 1.
      0. 1.]
 
 gmc=GMC_DEFAULTS
-gmc[1]=16
+gmc[1]=180
 gmc[2]=eps()
 
 e=Eggbox_Ensemble("Eggbox_test", 1000, priors, box, gmc...)
