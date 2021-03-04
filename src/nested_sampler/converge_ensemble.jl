@@ -20,7 +20,7 @@ function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), bac
         tuner_dict=deserialize(e.path*"/tuner") #restore tuner from saved if any
     end
 
-    meter = GMC_NS_Progress(e, 0.; start_it=curr_it, progargs...)
+    meter = GMC_NS_Progress(e, .1; start_it=curr_it, progargs...)
 
     converge_check = get_convfunc(converge_criterion)
 

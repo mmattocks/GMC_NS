@@ -17,7 +17,7 @@ struct Eggbox_Model <: GMC_NS_Model
     v::Vector{Float64} #model's velocity in parameter space
 end
 
-function construct_eggbox_model(trajectory::Integer, i::Integer, θ::Vector{Float64}, pos::Vector{Float64}, v::Vector{Float64}, obs::Vector{Float64}; v_init=false)
+function construct_eggbox_model(trajectory::Integer, i::Integer, θ::Vector{Float64}, pos::Vector{Float64}, v::Vector{Float64}, obs::Nothing; v_init=false)
     x1,x2=θ
     log_lh=(2 + cos(5π * x1) * cos(5π * x2))^5
     v_init && (v=rand(MvNormal(length(θ),1.)))

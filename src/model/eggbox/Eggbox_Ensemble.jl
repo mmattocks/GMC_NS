@@ -12,6 +12,7 @@ mutable struct Eggbox_Ensemble <: GMC_NS_Ensemble
     log_Zi::Vector{Float64}
     Hi::Vector{Float64}
 
+    obs::Nothing
     priors::Vector{<:Distribution}
     constants::Vector{<:Real}
     box::Matrix{Float64}
@@ -38,14 +39,15 @@ end
 Eggbox_Ensemble(path::String, no_models::Integer, prior, box, GMC_settings...; sample_posterior::Bool=true) =
 Eggbox_Ensemble(
     path,
-    construct_normal_model,
-    assemble_EMs(path, no_models, obs, prior, box, Vector{Real}())...,
+    construct_eggbox_model,
+    assemble_EMs(path, no_models, prior, box, Vector{Real}())...,
     [-Inf], #L0 = 0
 	[0.], #ie exp(0) = all of the prior is covered
 	[-Inf], #w0 = 0
 	[-Inf], #Liwi0 = 0
 	[-1e300], #Z0 = 0
 	[0.], #H0 = 0,
+    nothing,
     length(prior)==1 ? ([GMC_NS.marginals(prior)...]) : (prior),
     Vector{Real}(),
     length(prior)==1 ? (to_unit_ball.(box,[GMC_NS.marginals(prior)...])) : (to_unit_ball.(box,prior)),
@@ -54,8 +56,21 @@ Eggbox_Ensemble(
     GMC_settings...,
 	no_models+1)
 
-function Base.show(io::IO, e::Eggbox_Ensemble; xsteps=100, progress=true)
-    
+function Base.show(io::IO, e::Eggbox_Ensemble; progress=true)
+    x1o=[0.0, 0.4, 0.8, 0.2, 0.6, 1.0, 0.0, 0.4, 0.8, 0.2, 0.6, 1.0, 0.0,0.4,0.8,0.2,0.6,1.0]
+    x2o=[0.0, 0.0, 0.0, 0.2, 0.2, 0.2, 0.4, 0.4, 0.4, 0.6, 0.6, 0.6, 0.8, 0.8, 0.8,1.0, 1.0, 1.0]
+
+    x1m=[m.pos[1] for m in e.models]
+    x2m=[m.pos[2] for m in e.models]
+    x1m.+=1.; x2m.+=1.
+    x1m./=2.; x2m./=2
+
+    plt=scatterplot(x1o,x2o,title="Eggbox Ensemble: Contour $(round(e.contour,digits=2))",color=:green,name="Optima")
+    scatterplot!(plt, x1m, x2m, color=:magenta, name="Model Particles")
+    show(io, plt)
+    println()
+
+    (progress && return 17)
 end
 
 function assemble_EMs(path::String, no_trajectories::Integer, prior, box, constants)
@@ -72,7 +87,7 @@ function assemble_EMs(path::String, no_trajectories::Integer, prior, box, consta
             box_bound!(pos,box)
             θvec=to_prior.(pos,marginals)
 
-            model = construct_eggbox_model(trajectory_no, 1, θvec, pos, [0.], obs, constants...; v_init=true)
+            model = construct_eggbox_model(trajectory_no, 1, θvec, pos, [0.], nothing, constants...; v_init=true)
             
 			serialize(model_path, model) #save the model to the ensemble directory
 			push!(ensemble_records, Eggbox_Record(trajectory_no,1,pos,model_path,model.log_Li))
