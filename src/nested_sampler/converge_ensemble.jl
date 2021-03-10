@@ -40,12 +40,12 @@ function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), bac
     end
 
     if converge_check(e,converge_factor, mc_noise)
-        ms=measure_evidence(e)
-        @info "Job done, sampled to convergence. Final logZ $(ms.val) ± $(ms.err)"
+        final_logZ=measure_evidence(e)
+        @info "Job done, sampled to convergence. Final logZ $(final_logZ.val) ± $(final_logZ.err)"
 
         e_backup(e,tuner_dict) #final backup
         cln_switch && clean_ensemble_dir(e,0) #final clean
-        return ms
+        return final_logZ
     elseif curr_it==max_iterates
         @info "Job done, sampled to maximum iterate $max_iterates. Convergence criterion not obtained."
 

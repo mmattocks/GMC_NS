@@ -47,11 +47,11 @@ function nested_step!(e::GMC_NS_Ensemble, tuners::Dict{Int64,τ_PID}, cache::Uni
     push!(e.log_wi, logaddexp(e.log_Xi[i], - ((j+1)/N)) - log(2)) #log width of prior mass spanned by the last step-trapezoidal approx
     push!(e.log_Liwi, lps(e.log_Li[j],e.log_wi[j])) #log likelihood + log width = increment of evidence spanned by iterate
     push!(e.log_Zi, logaddexp(e.log_Zi[i],e.log_Liwi[j]))    #log evidence
-    #information- dimensionless quantity
+    #information- dimensionless quantity. cf. MultiNest @ https://github.com/farhanferoz/MultiNest/blob/master/MultiNest_v3.12/nested.F90- MultiNest now gives info only at the final step
     Hj=lps( 
-        (exp(lps(e.log_Liwi[j],-e.log_Zi[j])) * e.log_Li[j]), 
-        (exp(lps(e.log_Zi[i],-e.log_Zi[j])) * lps(e.Hi[i],e.log_Zi[i])),
-        -e.log_Zi[j])
+        (exp(lps(e.log_Liwi[j],-e.log_Zi[j])) * e.log_Li[j]), #information contribution of this step
+        (exp(lps(e.log_Zi[i],-e.log_Zi[j])) * lps(e.Hi[i],e.log_Zi[i])), #rescale last information
+        -e.log_Zi[j]) 
     Hj === -Inf ? push!(e.Hi,0.) : push!(e.Hi, Hj) #prevent problems from early strings of models with -Inf log likelihoods
 
     return 0, cache
