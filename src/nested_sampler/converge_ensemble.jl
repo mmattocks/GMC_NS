@@ -11,10 +11,11 @@ Keyword arguments to GMC_NS_Progress are passed from progargs.
 
 Skilling, John. “Nested Sampling for Bayesian Computations.” In Proc. Valencia. Benidorm (Alicante, Spain): inference.org.uk, 2006. https://www.inference.org.uk/bayesys/Valencia.pdf.
 """
-function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), backup::Tuple{Bool,Integer}=(false,0), clean::Tuple{Bool,Integer,Integer}=(false,0,0),  converge_criterion::String="standard", converge_factor::AbstractFloat=.01, mc_noise::AbstractFloat=0., progargs...)
+function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), backup::Tuple{Bool,Integer}=(false,0), clean::Tuple{Bool,Integer,Integer}=(false,0,0),  converge_criterion::String="standard", converge_factor::AbstractFloat=1e-3, mc_noise::AbstractFloat=0., progargs...)
     N = length(e.models); curr_it=length(e.log_Li)
 
     if curr_it==1 || !isfile(e.path*"/tuner")
+        serialize(e.path*"/ens",e)
         tuner_dict=get_tuner_dict(e)
     else
         tuner_dict=deserialize(e.path*"/tuner") #restore tuner from saved if any
@@ -36,7 +37,7 @@ function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), bac
         backup[1] && curr_it%backup[2] == 0 && e_backup(e,tuner_dict) #every backup interval, serialise the ensemble and tuner
         cln_switch && curr_it%clean[2] == 0 && clean_ensemble_dir(e,clean[3]) #every clean interval, remove old discarded models
 
-        update!(meter, converge_check(e,converge_factor,vals=true)...)
+        update!(meter, converge_check(e,converge_factor, vals=true)...)
     end
 
     if converge_check(e,converge_factor, mc_noise)
@@ -59,8 +60,6 @@ end
 
                     val=lps(findmax([model.log_Li for model in e.models])[1],  e.log_Xi[end])
                     thresh=lps(log(evidence_fraction),e.log_Zi[end])
-
-                    isinf(val)||isinf(thresh) && return false
 
                     vals ? (return val, thresh) : (return val<thresh)
                 end

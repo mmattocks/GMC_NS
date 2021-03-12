@@ -18,7 +18,10 @@ end
 
 function evidence_display(p)
     try
-        evplot=lineplot(p.e.log_Zi[2:end], title="Evidence History", xlabel="Iterate", color=:red, name="Ensemble logZ")
+        log_Zis=p.e.log_Zi[2:end]
+        posidx=findfirst(i->i > -Inf, log_Zis)
+        log_Zis[1:posidx-1].=log_Zis[posidx]
+        evplot=lineplot(log_Zis, title="Evidence History", xlabel="Iterate", color=:red, name="Ensemble logZ")
         lines=nrows(evplot.graphics)+5
         show(p.output, evplot); println()
         return lines

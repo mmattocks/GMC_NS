@@ -14,8 +14,7 @@ function galilean_search!(m,e,t,llidx,samples,s_limit,cache)
         new_model_record = rectype(new_m.trajectory,new_m.i, new_m.pos, string(e.path,'/',new_m.trajectory,'.',new_m.i), new_m.log_Li)
         push!(e.models, new_model_record) #insert new model record
         serialize(new_model_record.path, new_m)
-        move_cursor_up_while_clearing_lines(stdout,1)
-
+        
         return true, cache
     else
         return false, cache

@@ -29,7 +29,7 @@ function galilean_trajectory_sample!(m, e, tuner, cache)
 
         lhδ=lps(m.log_Li,-fwd_m.log_Li) #get the likelihood difference between the two points
         n=boundary_norm(adj_d,lhδ) #get the gradient normal for the distance and lhδ
-        box_rflct ? (v′=box_reflect(m.pos,e.box,m.v)) : v′=reflect(m.v,n,e.GMC_reflect_η) #get the reflected velocity vector off the boundary "east", or off the sampling box
+        box_rflct ? (v′=box_reflect(m.pos,e.box,m.v,e.GMC_reflect_η)) : v′=reflect(m.v,n,e.GMC_reflect_η) #get the reflected velocity vector off the boundary "east", or off the sampling box
         rd=τ*v′ #reflected distance given the timestep
         east_pos,_=box_move(m.pos,rd,e.box)
         cache=e.model_initλ(t, cache_i, to_prior.(east_pos,e.priors), east_pos, v′, e.obs, e.constants...) #try going east, or reflecting off the box
@@ -43,9 +43,13 @@ function galilean_trajectory_sample!(m, e, tuner, cache)
         end
         if cache.log_Li < m.log_Li
             process_report!(tuner, false)
-            south_pos,_=box_move(m.pos,-d,e.box)
 
-            cache=e.model_initλ(t, cache_i, to_prior.(south_pos,e.priors),south_pos,-m.v, e.obs, e.constants...)  #if west or box reflection fails, try south (reversed along the particle's vector)
+            e.GMC_reflect_η > 0. ? (v′=r_perturb(-m.v, e.GMC_reflect_η)) : (v′=-m.v)
+            sd=τ*v′ #south distance along perturbed reflexn vec
+
+            south_pos,_=box_move(m.pos,sd,e.box)
+
+            cache=e.model_initλ(t, cache_i, to_prior.(south_pos,e.priors),south_pos,-v′, e.obs, e.constants...)  #if west or box reflection fails, try south (reversed along the particle's vector)
         end
         cache.log_Li < m.log_Li && (process_report!(tuner, false)) #if that fails wait for smaller τ
     end
@@ -81,15 +85,16 @@ end
                     return pos+d, d, box_reflect
                 end
 
-                function box_reflect(pos,box,v)
+                function box_reflect(pos,box,v,η)
                     b=isapprox.(pos,box)
                     low_idxs=[v[i]<0&&b[i,1] for i in 1:length(v)]
                     hi_idxs=[v[i]>0&&b[i,2] for i in 1:length(v)]
 
-                    rv=copy(v)
-                    rv[low_idxs]=-v[low_idxs]
-                    rv[hi_idxs]=-v[hi_idxs]
-                    return rv
+                    v′=copy(v)
+                    v′[low_idxs]=-v[low_idxs]
+                    v′[hi_idxs]=-v[hi_idxs]
+
+                    η > 0. ? (return r_perturb(v′,η)) : (return v′)
                 end
 
                 function boundary_norm(v, lhδ)

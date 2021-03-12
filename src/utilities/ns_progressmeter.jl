@@ -104,6 +104,7 @@ function update!(p::GMC_NS_Progress, val, thresh; options...)
     push!(p.time_history, p.tstp)
 
     p.interval = val - thresh
+    isinf(p.interval) && (p.interval = 0.)
     popfirst!(p.convergence_history)
     push!(p.convergence_history, p.interval)    
 
@@ -117,7 +118,7 @@ function updateProgress!(p::GMC_NS_Progress; offset::Integer = p.offset, keep = 
     t = time()
     p.display_rotate_iterates > 0 && p.counter%p.display_rotate_iterates == 0 && rotate_displays(p)
 
-    if p.interval <= 0 && !p.triggered
+    if p.interval < 0 && !p.triggered
         p.triggered = true
         if p.printed
             p.triggered = true

@@ -50,7 +50,7 @@ function nested_step!(e::GMC_NS_Ensemble, tuners::Dict{Int64,τ_PID}, cache::Uni
     #information- dimensionless quantity. cf. MultiNest @ https://github.com/farhanferoz/MultiNest/blob/master/MultiNest_v3.12/nested.F90- MultiNest now gives info only at the final step
     Hj=lps( 
         (exp(lps(e.log_Liwi[j],-e.log_Zi[j])) * e.log_Li[j]), #information contribution of this step
-        (exp(lps(e.log_Zi[i],-e.log_Zi[j])) * lps(e.Hi[i],e.log_Zi[i])), #rescale last information
+        (exp(lps(e.log_Zi[i],-e.log_Zi[j])) * lps(e.Hi[i],e.log_Zi[i])), #rescale last information by evidence
         -e.log_Zi[j]) 
     Hj === -Inf ? push!(e.Hi,0.) : push!(e.Hi, Hj) #prevent problems from early strings of models with -Inf log likelihoods
 

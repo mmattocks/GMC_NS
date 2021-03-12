@@ -42,10 +42,10 @@ Normal_Ensemble(
     construct_normal_model,
     assemble_NMs(path, no_models, obs, prior, box, Vector{Real}())...,
     [-Inf], #L0 = 0
-	[0.], #ie exp(0) = all of the prior is covered
+	[0.], #X0 = 1
 	[-Inf], #w0 = 0
 	[-Inf], #Liwi0 = 0
-	[-1e300], #Z0 = 0
+	[-Inf], #Z0 = 0
 	[0.], #H0 = 0,
     obs,
     length(prior)==1 ? ([GMC_NS.marginals(prior)...]) : (prior),
