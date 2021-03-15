@@ -15,7 +15,12 @@ function galilean_trajectory_sample!(m, e, tuner, cache)
     fwd_pos,adj_d,box_rflct=box_move(m.pos,d,e.box)
   
     if !box_rflct #if we're not stopped by the sampling box
-        fwd_m=e.model_initλ(t, next_i, to_prior.(fwd_pos,e.priors), fwd_pos, m.v, e.obs, e.constants...)  #try to proceed along distance vector
+        try
+            fwd_m=e.model_initλ(t, next_i, to_prior.(fwd_pos,e.priors), fwd_pos, m.v, e.obs, e.constants...)  #try to proceed along distance vector
+        catch
+            throw(DomainError("$m"))
+        end
+
         if m.θ==fwd_m.θ #if forward motion is no longer making a difference to the parameter vector (ie timestep is too small), kill the trajectory and bail out
             tuner.τ=e.GMC_τ_death
             return m, nothing
@@ -72,7 +77,7 @@ end
 
                         for idx in findall(x->x>=0.,boundary_t) #for any boundaries the particle is riding (distance 0), give a small positive time if the particle is headed into the boundary to allow that dimension to be selected for bounding
                             (dim,bound)=(idx[1],idx[2])
-                            boundary_t[idx]==0. && ((bound==1 && d[dim] < 0.) || (bound==2 && d[dim] > 0.)) && (boundary_t[idx]=eps())
+                            boundary_t[idx]==0. && ((bound==1 && d[dim] < 0.) || (bound==2 && d[dim] > 0.)) && (boundary_t[idx]=nextfloat(0.))
                         end
 
                         first_b_idx=findfirst(isequal(minimum(boundary_t[findall(x->x>0.,boundary_t)])),boundary_t) #find the index of the first boundary that would be hit
