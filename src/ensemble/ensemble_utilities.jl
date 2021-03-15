@@ -81,7 +81,7 @@ function reset_ensemble!(e::GMC_NS_Ensemble)
 
     e.t_counter=length(e.models)+1
 
-    clean_ensemble_dir(e, 0; ignore_warn=true)
+    clean_ensemble_dir!(e)
     isfile(e.path*"/tuner") && rm(e.path*"/tuner")
     serialize(e.path*"/ens", e)
 

@@ -15,12 +15,7 @@ function galilean_trajectory_sample!(m, e, tuner, cache)
     fwd_pos,adj_d,box_rflct=box_move(m.pos,d,e.box)
   
     if !box_rflct #if we're not stopped by the sampling box
-        try
-            fwd_m=e.model_initλ(t, next_i, to_prior.(fwd_pos,e.priors), fwd_pos, m.v, e.obs, e.constants...)  #try to proceed along distance vector
-        catch
-            throw(DomainError("$m"))
-        end
-
+        fwd_m=e.model_initλ(t, next_i, to_prior.(fwd_pos,e.priors), fwd_pos, m.v, e.obs, e.constants...)  #try to proceed along distance vector
         if m.θ==fwd_m.θ #if forward motion is no longer making a difference to the parameter vector (ie timestep is too small), kill the trajectory and bail out
             tuner.τ=e.GMC_τ_death
             return m, nothing
@@ -37,15 +32,15 @@ function galilean_trajectory_sample!(m, e, tuner, cache)
         box_rflct ? (v′=box_reflect(m.pos,e.box,m.v,e.GMC_reflect_η)) : v′=reflect(m.v,n,e.GMC_reflect_η) #get the reflected velocity vector off the boundary "east", or off the sampling box
         rd=τ*v′ #reflected distance given the timestep
         east_pos,_=box_move(m.pos,rd,e.box)
-        cache=e.model_initλ(t, cache_i, to_prior.(east_pos,e.priors), east_pos, v′, e.obs, e.constants...) #try going east, or reflecting off the box
+        cache=e.model_initλ(t, cache_i, to_prior.(east_pos,e.priors), east_pos, v′, e.obs, e.constants...) #try going>
 
         if cache.log_Li < m.log_Li && !box_rflct #no west reflection off the sampling box
             process_report!(tuner, false)
 
             west_pos,_=box_move(m.pos,-rd,e.box)
-
             cache=e.model_initλ(t, cache_i, to_prior.(west_pos,e.priors), west_pos, -v′, e.obs, e.constants...)  #if east reflection fails, try west
         end
+
         if cache.log_Li < m.log_Li
             process_report!(tuner, false)
 
@@ -53,7 +48,6 @@ function galilean_trajectory_sample!(m, e, tuner, cache)
             sd=τ*v′ #south distance along perturbed reflexn vec (inverted m.v)
 
             south_pos,_=box_move(m.pos,sd,e.box)
-
             cache=e.model_initλ(t, cache_i, to_prior.(south_pos,e.priors),south_pos,v′, e.obs, e.constants...)  #if west or box reflection fails, try south (reversed along the particle's vector)
         end
         cache.log_Li < m.log_Li && (process_report!(tuner, false)) #if that fails wait for smaller τ
@@ -87,7 +81,10 @@ end
 
                     all(d.==0.) ? box_reflect=true : box_reflect=false
 
-                    return pos+d, d, box_reflect
+                    new_pos=pos+d
+                    !(all(box[:,1].<new_pos.<box[:,2])) && box_bound!(new_pos,box)
+
+                    return new_pos, d, box_reflect
                 end
 
                 function box_reflect(pos,box,v,η)
