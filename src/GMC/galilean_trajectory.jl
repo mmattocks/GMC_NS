@@ -25,7 +25,7 @@ function galilean_trajectory_sample!(m, e, tuner, cache)
     end
 
     if box_rflct || (fwd_m.log_Li < m.log_Li) #if no model is available from the position along the distance vector, search for reflections and store in cache
-        process_report!(tuner, false)
+        process_report!(tuner, false) #report a reflection off a lh contour
 
         lhδ=lps(m.log_Li,-fwd_m.log_Li) #get the likelihood difference between the two points
         n=boundary_norm(adj_d,lhδ) #get the gradient normal for the distance and lhδ
@@ -45,11 +45,11 @@ function galilean_trajectory_sample!(m, e, tuner, cache)
             process_report!(tuner, false)
 
             e.GMC_reflect_η > 0. ? (v′=r_perturb(-m.v, e.GMC_reflect_η)) : (v′=-m.v)
-            sd=τ*v′ #south distance along perturbed reflexn vec
+            sd=τ*v′ #south distance along perturbed reflexn vec (inverted m.v)
 
             south_pos,_=box_move(m.pos,sd,e.box)
 
-            cache=e.model_initλ(t, cache_i, to_prior.(south_pos,e.priors),south_pos,-v′, e.obs, e.constants...)  #if west or box reflection fails, try south (reversed along the particle's vector)
+            cache=e.model_initλ(t, cache_i, to_prior.(south_pos,e.priors),south_pos,v′, e.obs, e.constants...)  #if west or box reflection fails, try south (reversed along the particle's vector)
         end
         cache.log_Li < m.log_Li && (process_report!(tuner, false)) #if that fails wait for smaller τ
     end
