@@ -6,7 +6,7 @@ Step and update ensemble e by sampling the e.contour-bounded prior mass via Gali
 """
 
 function nested_step!(e::GMC_NS_Ensemble, tuners::Dict{Int64,τ_PID}, cache::Union{GMC_NS_Model,Nothing})
-    N = length(e.models) #number of sample models/particles on the posterior surface
+    N = length(e.models); N′=N #number of sample models/particles on the posterior surface
     i = length(e.log_Li) #iterate number, index for last values
     j = i+1 #index for newly pushed values
 
@@ -30,6 +30,7 @@ function nested_step!(e::GMC_NS_Ensemble, tuners::Dict{Int64,τ_PID}, cache::Uni
             model_selected=true
             e.sample_posterior && push!(e.posterior_samples, e.models[least_likely_idx])#if sampling posterior, push the model record to the ensemble's posterior samples vector
             deleteat!(e.models, least_likely_idx) #remove least likely model record from the active particles in the ensemble
+            N′-=1 #update for trapezoidal log_wi calc
         end
     end
 
@@ -42,9 +43,9 @@ function nested_step!(e::GMC_NS_Ensemble, tuners::Dict{Int64,τ_PID}, cache::Uni
     samples==sample_limit && (return 1, cache) #failed to find a new sample after sampling up to the limit, return an error code
       
     #UPDATE ENSEMBLE QUANTITIES   
-    push!(e.log_Li, minimum([model.log_Li for model in e.models])) #log likelihood of the least likely model - the current ensemble ll contour at Xi
+    push!(e.log_Li, e.contour) #log likelihood of the least likely model - the current ensemble ll contour at Xi
     push!(e.log_Xi, -i/N) #log Xi - crude estimate of the iterate's enclosed prior mass
-    push!(e.log_wi, logaddexp(e.log_Xi[i], - ((j+1)/N)) - log(2)) #log width of prior mass spanned by the last step-trapezoidal approx
+    push!(e.log_wi, logsubexp(e.log_Xi[i], -j/N′) - log(2)) #log width of prior mass spanned by the last step-trapezoidal approx
     push!(e.log_Liwi, lps(e.log_Li[j],e.log_wi[j])) #log likelihood + log width = increment of evidence spanned by iterate
     push!(e.log_Zi, logaddexp(e.log_Zi[i],e.log_Liwi[j]))    #log evidence
     #information- dimensionless quantity. cf. MultiNest @ https://github.com/farhanferoz/MultiNest/blob/master/MultiNest_v3.12/nested.F90- MultiNest now gives info only at the final step

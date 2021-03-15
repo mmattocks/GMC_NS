@@ -14,7 +14,7 @@
     @test boxed_pos==[1.,1.]
     @test boxed_d==[.5,.5]
 
-    box_reflect_v=box_reflect([.5,.99999999],box,[.1,.1])
+    box_reflect_v=box_reflect([.5,.99999999],box,[.1,.1],0.)
     @test box_reflect_v==[.1,-.1]
 
     #test boundary norm finding

@@ -70,7 +70,7 @@ function Base.show(io::IO, e::Eggbox_Ensemble; progress=true)
     show(io, plt)
     println()
 
-    (progress && return 17)
+    (progress && return 19)
 end
 
 function assemble_EMs(path::String, no_trajectories::Integer, prior, box, constants)

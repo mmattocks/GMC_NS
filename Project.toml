@@ -1,7 +1,7 @@
 name = "GMC_NS"
 uuid = "9078412d-88cf-4063-aac6-2559f950d761"
 authors = ["Michael Mattocks <mike.mattocks@utoronto.ca>"]
-version = "0.3.0"
+version = "0.3.5"
 
 [deps]
 BioBackgroundModels = "71d2fffc-6959-458e-9716-bd512c1bc899"

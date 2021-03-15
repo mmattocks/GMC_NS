@@ -1,9 +1,12 @@
 function galilean_search!(m,e,t,llidx,samples,s_limit,cache)
     new_m,cache=galilean_trajectory_sample!(m,e,t,cache)
+    m.i==1 && ((m,new_m,cache)=start_trim(m,new_m,cache))
+
 
     while new_m.i==m.i && samples<=s_limit && t.τ > e.GMC_τ_death#failure to find any new step, retune tau and try again until sample limit reached or trajectory's tuner reaches taudeath
         new_m,cache=galilean_trajectory_sample!(m,e,t,cache)
         samples+=1
+        m.i==1 && ((m,new_m,cache)=start_trim(m,new_m,cache))
     end
 
     if new_m.i!=m.i
@@ -19,6 +22,19 @@ function galilean_search!(m,e,t,llidx,samples,s_limit,cache)
     else
         return false, cache
     end
+end
+
+function start_trim(m,new_m,cache)
+    if new_m.i!=m.i && isapprox(new_m.pos,m.pos)
+        params=[getfield(m,pn) for pn in propertynames(m)]
+        params[6]=new_m.v
+        m=typeof(m)(params...)
+        params=[getfield(cache,pn) for pn in propertynames(m)]
+        params[2]=2;
+        new_m=typeof(m)(params...)
+        cache=nothing   
+    end
+    return m,new_m,cache
 end
 
 function diffusion_search!(e, tuners, llidx, sample_limit, τ_limit)
@@ -41,10 +57,10 @@ function diffusion_search!(e, tuners, llidx, sample_limit, τ_limit)
             new_m=e.model_initλ(e.t_counter, 1, to_prior.(new_pos,e.priors), new_pos, randdir, e.obs, e.constants...)
         end
 
-        new_m.log_Li > e.contour && (model_selected=true; src_traj=model.trajectory)
+        new_m.log_Li >= e.contour && (model_selected=true; src_traj=model.trajectory)
     end
 
-    if new_m.log_Li > e.contour
+    if new_m.log_Li >= e.contour
         e.sample_posterior && push!(e.posterior_samples, e.models[llidx])#if sampling posterior, push the model record to the ensemble's posterior samples vector
         rectype=typeof(e.models[1])
         deleteat!(e.models, llidx) #remove least likely model record
@@ -59,6 +75,16 @@ function diffusion_search!(e, tuners, llidx, sample_limit, τ_limit)
     else
         return false
     end
+end
+
+function insert_reflection!(e, cache, llidx)
+    e.sample_posterior && push!(e.posterior_samples, e.models[llidx])#if sampling posterior, push the model record to the ensemble's posterior samples vector
+    rectype=typeof(e.models[1])
+    deleteat!(e.models, llidx) #remove least likely model record
+
+    new_model_record = rectype(cache.trajectory,cache.i, cache.pos, string(e.path,'/',cache.trajectory,'.',cache.i), cache.log_Li)
+    push!(e.models, new_model_record) #insert new model record
+    serialize(new_model_record.path, cache)
 end
 
 function ellipsoid_resample!(e,tdict,llidx,samples,s_limit)

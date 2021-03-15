@@ -30,7 +30,7 @@ function converge_ensemble!(e::GMC_NS_Ensemble; max_iterates=typemax(Int64), bac
     cln_switch = clean[1] && !e.sample_posterior #ignore clean arguments if posterior samples are to be collected
 
     while !converge_check(e, converge_factor, mc_noise) && (curr_it <= max_iterates)
-        warn = nested_step!(e, tuner_dict, reflect_cache)
+        warn, reflect_cache = nested_step!(e, tuner_dict, reflect_cache)
         warn == 1 && (@error "Failed to find new models, aborting at current iterate."; return e)
         curr_it += 1
 

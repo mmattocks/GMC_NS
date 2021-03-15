@@ -207,9 +207,9 @@ function reestimate_ensemble!(e::GMC_NS_Ensemble, wi_mode="trapezoidal")
         e.log_Xi[j]=-i/Ni[i]
 
         if wi_mode=="trapezoidal"
-            e.log_wi[j]= logaddexp(e.log_Xi[i], - ((j+1)/Ni[i])) - log(2) #log width of prior mass spanned by the last step-trapezoidal approx
+            e.log_wi[j]= logsubexp(e.log_Xi[i], -j/Ni[j]) - log(2) #log width of prior mass spanned by the last step-trapezoidal approx
         elseif wi_mode=="simple"
-            e.log_wi[j]= logaddexp(e.log_Xi[i], - e.log_Xi[j]/Ni[i]) #log width of prior mass spanned by the last step-simple approx
+            e.log_wi[j]= logsubexp(e.log_Xi[i], e.log_Xi[j]) #log width of prior mass spanned by the last step-simple approx
         else
             throw(ArgumentError("Unsupported wi_mode!"))
         end
