@@ -35,7 +35,7 @@ function nested_step!(e::GMC_NS_Ensemble, tuners::Dict{Int64,τ_PID}, cache::Uni
     end
 
     if cache_insert #in this case a cached precalculated reflection model can be used
-        insert_reflection!(e, cache, least_likely_idx) #insert the model into the ensemble
+        insert_reflection!(e, cache) #insert the model into the ensemble
         process_report!(t, true)
         cache=nothing #reset the cache
     end
