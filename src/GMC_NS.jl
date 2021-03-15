@@ -17,7 +17,7 @@ module GMC_NS
     #GMC settings vector fields: [GMC_Nmin::Int64, GMC_τ_death::Float64, GMC_init_τ::Float64, GMC_tune_μ::Int64, GMC_tune_α::Float64, GMC_tune_PID::NTuple{3,Float64}, GMC_timestep_η::Float64, GMC_reflect_η::Float64, GMC_exhaust_σ::Float64, GMC_chain_κ::Int64]
 
     #should GMC_reflect_η be smaller?
-    GMC_DEFAULTS=Vector{Any}([50,1e-3,1., 4,.25,(.5,0.,.0), .25, .25, 10., typemax(Int64)])
+    GMC_DEFAULTS=Vector{Any}([50,1e-5,1., 4,.25,(.3,0.,.0), .25, .005, 10., typemax(Int64)])
     export GMC_DEFAULTS
 
     include("ensemble/GMC_NS_Ensemble.jl")
