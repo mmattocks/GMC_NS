@@ -36,7 +36,7 @@ mutable struct Eggbox_Ensemble <: GMC_NS_Ensemble
     t_counter::Int64
 end
 
-Eggbox_Ensemble(path::String, no_models::Integer, prior, box, GMC_settings...; sample_posterior::Bool=true) =
+Eggbox_Ensemble(path::String, no_models::Integer, prior, box, GS_settings...; sample_posterior::Bool=true) =
 Eggbox_Ensemble(
     path,
     construct_eggbox_model,
@@ -53,7 +53,7 @@ Eggbox_Ensemble(
     length(prior)==1 ? (to_unit_ball.(box,[GMC_NS.marginals(prior)...])) : (to_unit_ball.(box,prior)),
     sample_posterior,
     Vector{Eggbox_Record}(),
-    GMC_settings...,
+    GS_settings...,
 	no_models+1)
 
 function Base.show(io::IO, e::Eggbox_Ensemble; progress=true)

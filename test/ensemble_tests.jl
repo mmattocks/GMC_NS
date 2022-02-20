@@ -21,7 +21,7 @@
 
     gmc=GMC_DEFAULTS
     gmc[1]=3
-    gmc[2]=eps()
+    gmc[2]=1e-5
     gmc[end]=1e4
 
     ne=Normal_Ensemble("NE_test", n_chains, samples, n_priors, n_box, gmc...)

@@ -191,7 +191,7 @@ end
 
 function reestimate_ensemble!(e::GMC_NS_Ensemble, wi_mode="trapezoidal")
     Ni=Int64.(round.(collect(-1:-1:-length(e.log_Li)+1)./e.log_Xi[2:end]))
-    insert!(Ni,1,Ni[1])
+    push!(Ni, length(e.models))
 
     #fix any borked starting values
     e.log_Li[1]=-Inf #L0 = 0
@@ -203,6 +203,8 @@ function reestimate_ensemble!(e::GMC_NS_Ensemble, wi_mode="trapezoidal")
 
     for i in 1:length(e.log_Li)-1
         j=i+1
+
+        e.log_Li[j]=e.posterior_samples[i].log_Li
 
         e.log_Xi[j]=-i/Ni[i]
 
